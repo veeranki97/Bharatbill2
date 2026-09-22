@@ -329,9 +329,9 @@ export default function ExpenseTracker() {
       {/* Add/Edit Modal */}
       {showForm && (
         <div className="modal-overlay" onClick={closeForm}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '620px' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '760px', padding: '1rem 1.25rem' }}>
             <h3 className="section-title">{editingId ? 'Edit Expense' : 'Add Expense'}</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="form-group">
                 <label className="form-label">Date *</label>
                 <input type="date" className="form-input" value={form.date} onChange={e => updateField('date', e.target.value)} />
