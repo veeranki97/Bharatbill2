@@ -382,7 +382,7 @@ const LineItem = memo(function LineItem({
         <input type="number" min="0" step="any" className="form-input" value={item.rate}
           onChange={(e) => onFieldChange(item.id, 'rate', clampNonNeg(e.target.value))} />
       </div>
-      {invoiceOptions.showDiscount && (
+      {false && invoiceOptions.showDiscount && (
         <div className="line-item-field" style={{ flex: 1.8, minWidth: 200 }}>
           <label className="form-label">Discount</label>
           {/* v1.10.22 — two-mode discount: fixed rupees OR percent-of-line.
@@ -1169,7 +1169,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   // that stale split is what Save stored.
   const totals = useMemo(() => computeInvoiceTotals({
     items, profile, client, details, showGST, taxInclusive,
-    invoiceOptions,
+    invoiceOptions: { ...invoiceOptions, showDiscount: false, invoiceDiscountValue: 0 },
   }), [items, client.state, client?.country, client?.gstin, client?.isSEZ, profile?.state, profile?.country, profile?.gstin, showGST, taxInclusive, invoiceOptions.showRoundOff, invoiceOptions.showTDS, invoiceOptions.tdsRate, invoiceOptions.tdsCumulativeThisYear, invoiceOptions.showTCS, invoiceOptions.tcsRate, invoiceOptions.tcsCumulativeThisYear, invoiceOptions.reverseCharge, invoiceOptions.invoiceDiscountValue, invoiceOptions.invoiceDiscountType, details?.placeOfSupply]);
 
   // v1.10.24 — Compute available client credit from prior overpayments.
@@ -3614,7 +3614,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
                   <button type="button" className="btn btn-secondary"
                     onClick={() => {
-                      const allKeys = ['showLogo','showBusinessName','showBusinessAddress','showBusinessPhone','showBusinessEmail','showState','showGSTIN','showClientAddress','showClientPhone','showClientEmail','showPlaceOfSupply','showInvoiceNumber','showInvoiceDate','showDueDate','showHSN','showItemQty','showItemUnit','showRateColumn','showDiscount','showGST','showSubtotal','showAmountWords','showRoundOff','showBankDetails','showAccountLabel','showUPI','showSignature','showSignatoryText','showTerms','showNotes'];
+                      const allKeys = ['showLogo','showBusinessName','showBusinessAddress','showBusinessPhone','showBusinessEmail','showState','showGSTIN','showClientAddress','showClientPhone','showClientEmail','showPlaceOfSupply','showInvoiceNumber','showInvoiceDate','showDueDate','showHSN','showItemQty','showItemUnit','showRateColumn','showGST','showSubtotal','showAmountWords','showRoundOff','showBankDetails','showAccountLabel','showUPI','showSignature','showSignatoryText','showTerms','showNotes'];
                       setInvoiceOptions(prev => { const out = { ...prev }; allKeys.forEach(k => { out[k] = false; }); return out; });
                     }}
                     style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}>
@@ -4100,9 +4100,8 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
               }}>Fill Down ALL</button>
             </div>
 
-            {/* v1.10.22 — invoice-level (whole-bill) discount. Sits below
-                the line items so it reads as "…and then take X off the
-                whole bill". Zero value = no line renders in the preview. */}
+            {/* Discount hard-disabled for service ERP — line + whole-bill UI hidden; totals force discount 0 */}
+            {false && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: '0.75rem', flexWrap: 'wrap' }}>
               <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Discount on total (whole bill)</label>
               <input type="number" min="0" step="any" className="form-input"
@@ -4120,6 +4119,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 Applied after tax. For GST-compliant pre-tax discount, use per-line discount instead.
               </span>
             </div>
+            )}
           </div>
 
           {/* Terms */}
