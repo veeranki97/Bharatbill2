@@ -21,6 +21,7 @@ export default function VendorsView() {
     isVendor: true, type: 'vendor', sites: ['Main Site'],
   });
 
+  // GSTIN first 2 digits → state (SD Dynamics parity)
   const STATE_BY_CODE = {
     '01': 'Jammu and Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh',
     '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan', '09': 'Uttar Pradesh',
@@ -97,7 +98,9 @@ export default function VendorsView() {
             width: 'min(720px, 96vw)', maxHeight: '90vh', overflowY: 'auto',
           }}>
             <h3 style={{ marginTop: 0 }}>{list.some(x => x.id === form.id) ? 'Edit' : 'New'} Vendor</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem 1rem' }}>
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem 1rem',
+            }}>
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                 <label className="form-label">Vendor Name *</label>
                 <input className="form-input" value={form.name || ''}
