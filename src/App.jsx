@@ -505,7 +505,7 @@ function App() {
     { id: 'reports', icon: BarChart3, label: 'Reports', module: 'reports', group: 'Compliance' },
     { id: 'filing', icon: BookOpen, label: 'GST Returns', module: 'gstReturns', group: 'Compliance' },
     { id: 'incometax', icon: Calculator, label: 'Income Tax', module: 'incomeTax', group: 'Compliance' },
-    { id: 'inventory', icon: Package, label: 'Products', module: 'inventory', group: 'System' },
+    { id: 'inventory', icon: Package, label: 'Services', module: 'inventory', group: 'System' },
     { id: 'guide', icon: HelpCircle, label: 'User Guide', module: 'dashboard', group: 'System' },
   ].filter(item => showIfModule(item.module));
 
