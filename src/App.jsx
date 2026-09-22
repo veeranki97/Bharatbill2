@@ -399,6 +399,22 @@ function App() {
   // covering the page that was just asked for. Opening the business list is
   // the one exception: that choice is not finished yet.
   const [navOpen, setNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      const v = localStorage.getItem('freegstbill_sidebar_collapsed');
+      return v === null ? true : v === '1';
+    } catch { return true; }
+  });
+  const [sidebarHovered, setSidebarHovered] = useState(false);
+  const sidebarExpanded = !sidebarCollapsed || sidebarHovered || navOpen;
+  const toggleSidebarPin = () => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('freegstbill_sidebar_collapsed', next ? '1' : '0'); } catch {}
+      return next;
+    });
+  };
+
   const closeNavAfterPick = (e) => {
     const picked = e.target.closest('button');
     if (picked && !picked.classList.contains('profile-switcher-btn')) setNavOpen(false);
@@ -707,7 +723,7 @@ function App() {
   })();
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout${sidebarCollapsed && !sidebarHovered ? ' app-layout-sidebar-collapsed' : ''}`}>
       {showWizard && <SetupWizard onClose={() => setShowWizard(false)} />}
       {showResumeSetupPill && (
         <button type="button"
@@ -735,15 +751,29 @@ function App() {
         <span className="mobile-topbar-business">{profile?.businessName || ''}</span>
       </div>
       {navOpen && <div className="sidebar-backdrop" onClick={() => setNavOpen(false)} aria-hidden="true" />}
-      <div className={`sidebar${navOpen ? ' sidebar-open' : ''}`} onClick={closeNavAfterPick}>
+      <div
+        className={`sidebar${navOpen ? ' sidebar-open' : ''}${sidebarCollapsed && !sidebarHovered && !navOpen ? ' sidebar-collapsed' : ''}${sidebarExpanded ? ' sidebar-expanded' : ''}`}
+        onClick={closeNavAfterPick}
+        onMouseEnter={() => setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
+      >
         <div className="sidebar-brand">
           <div className="sidebar-logo">
             <FileText size={22} />
           </div>
-          <div>
+          <div className="sidebar-brand-text">
             <h2 className="sidebar-title">GST Billing</h2>
             <p className="sidebar-subtitle">by DiceCodes</p>
           </div>
+          <button
+            type="button"
+            className="sidebar-pin-btn"
+            title={sidebarCollapsed ? 'Keep sidebar open' : 'Auto-hide sidebar'}
+            onClick={(e) => { e.stopPropagation(); toggleSidebarPin(); }}
+            aria-label={sidebarCollapsed ? 'Pin sidebar open' : 'Auto-hide sidebar'}
+          >
+            <Menu size={16} />
+          </button>
         </div>
 
         <div className="profile-switcher" ref={profileMenuRef} style={{ position: 'relative' }}>
@@ -794,7 +824,7 @@ function App() {
               className={`nav-btn ${currentView === item.id ? 'nav-btn-active' : ''}`}
               onClick={item.onClick || (() => setCurrentView(item.id))}
             >
-              <item.icon size={18} /> {item.label}
+              <item.icon size={18} /> <span className="nav-label">{item.label}</span>
             </button>
           ))}
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
