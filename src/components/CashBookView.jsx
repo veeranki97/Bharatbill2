@@ -1,0 +1,186 @@
+import { useState, useEffect, useMemo } from 'react';
+import { Banknote } from 'lucide-react';
+import { getAllReceipts, getAllBills, getAllExpenses, getProfile } from '../store';
+import { formatCurrency, belongsToProfile } from '../utils';
+import { toast } from './Toast';
+
+/**
+ * Chronological cash book with opening balance + running balance.
+ * Opening balance stored in localStorage key freegstbill_cashbook_ob
+ */
+export default function CashBookView() {
+  const [receipts, setReceipts] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [bills, setBills] = useState([]);
+  const [profile, setProfile] = useState({});
+  const [ob, setOb] = useState(() => {
+    try { return Number(localStorage.getItem('freegstbill_cashbook_ob') || 0); } catch { return 0; }
+  });
+  const [tab, setTab] = useState('ledger');
+  const [dayDate, setDayDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [obDate, setObDate] = useState(() => {
+    try { return localStorage.getItem('freegstbill_cashbook_ob_date') || '2024-04-01'; } catch { return '2024-04-01'; }
+  });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [r, e, b, p] = await Promise.all([
+          getAllReceipts(), getAllExpenses(), getAllBills(), getProfile()
+        ]);
+        setProfile(p || {});
+        setReceipts((r || []).filter(x => belongsToProfile(x, p)));
+        setExpenses((e || []).filter(x => belongsToProfile(x, p)));
+        setBills((b || []).filter(x => belongsToProfile(x, p)));
+      } catch {
+        toast('Failed to load cash book data', 'error');
+      }
+    })();
+  }, []);
+
+  const rows = useMemo(() => {
+    const entries = [];
+    receipts.forEach(r => {
+      const amt = Number(r.amount) || 0;
+      entries.push({
+        date: r.date,
+        type: 'Receipt',
+        ref: r.receiptNo || r.againstInvoice || '',
+        name: r.clientName,
+        inflow: amt > 0 ? amt : 0,
+        outflow: amt < 0 ? Math.abs(amt) : 0,
+      });
+    });
+    expenses.forEach(ex => {
+      const amt = Math.abs(Number(ex.amount) || 0);
+      entries.push({
+        date: ex.date,
+        type: 'Expense',
+        ref: ex.category || '',
+        name: ex.description || ex.vendor || '',
+        inflow: 0,
+        outflow: amt,
+      });
+    });
+    entries.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    let bal = Number(ob) || 0;
+    return entries
+      .filter(e => !obDate || !e.date || e.date >= obDate)
+      .map(e => {
+        bal = bal + e.inflow - e.outflow;
+        return { ...e, balance: bal };
+      });
+  }, [receipts, expenses, ob, obDate]);
+
+  const saveOb = () => {
+    localStorage.setItem('freegstbill_cashbook_ob', String(ob));
+    localStorage.setItem('freegstbill_cashbook_ob_date', obDate);
+    toast('Opening balance saved', 'success');
+  };
+
+  const closing = rows.length ? rows[rows.length - 1].balance : Number(ob) || 0;
+
+  return (
+    <div className="page">
+      <div className="page-header" style={{ marginBottom: '1rem' }}>
+        <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Banknote size={22} /> Cash Book
+        </h2>
+        <p className="page-subtitle">Running balance from receipts & expenses</p>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <button type="button" className={`btn ${tab === 'ledger' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('ledger')}>Bank Ledger</button>
+        <button type="button" className={`btn ${tab === 'day' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('day')}>Day Book</button>
+      </div>
+
+      {tab === 'day' && (() => {
+        const dayRows = rows.filter(r => r.date === dayDate);
+        const tin = dayRows.reduce((s, r) => s + r.inflow, 0);
+        const tout = dayRows.reduce((s, r) => s + r.outflow, 0);
+        return (
+          <div className="glass-panel p-4 mb-4">
+            <div className="form-group" style={{ maxWidth: 220 }}>
+              <label className="form-label">Date</label>
+              <input type="date" className="form-input" value={dayDate} onChange={e => setDayDate(e.target.value)} />
+            </div>
+            <p><strong>In:</strong> {formatCurrency(tin)} · <strong>Out:</strong> {formatCurrency(tout)}</p>
+            <table className="data-table" style={{ width: '100%' }}>
+              <thead>
+                <tr>
+                  <th>Type</th><th>Ref</th><th>Particulars</th>
+                  <th className="text-end">In</th><th className="text-end">Out</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dayRows.map((r, i) => (
+                  <tr key={i}>
+                    <td>{r.type}</td>
+                    <td>{r.ref}</td>
+                    <td>{r.name}</td>
+                    <td className="text-end">{r.inflow ? formatCurrency(r.inflow) : '—'}</td>
+                    <td className="text-end">{r.outflow ? formatCurrency(r.outflow) : '—'}</td>
+                  </tr>
+                ))}
+                {dayRows.length === 0 && (
+                  <tr><td colSpan={5} style={{ textAlign: 'center' }}>No vouchers this day</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
+
+      {tab === 'ledger' && (
+        <>
+          <div className="glass-panel p-4 mb-4" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'end' }}>
+            <div className="form-group">
+              <label className="form-label">Opening balance (₹)</label>
+              <input type="number" className="form-input" value={ob} onChange={e => setOb(Number(e.target.value) || 0)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">As of date</label>
+              <input type="date" className="form-input" value={obDate} onChange={e => setObDate(e.target.value)} />
+            </div>
+            <button type="button" className="btn btn-primary" onClick={saveOb}>Save OB</button>
+            <div style={{ marginLeft: 'auto', fontWeight: 700 }}>
+              Closing: {formatCurrency(closing)}
+            </div>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table" style={{ width: '100%' }}>
+              <thead>
+                <tr>
+                  <th>Date</th><th>Type</th><th>Ref</th><th>Particulars</th>
+                  <th className="text-end">In</th><th className="text-end">Out</th><th className="text-end">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ background: '#f8fafc' }}>
+                  <td colSpan={4}><strong>Opening balance</strong></td>
+                  <td></td><td></td>
+                  <td className="text-end"><strong>{formatCurrency(ob)}</strong></td>
+                </tr>
+                {rows.map((r, i) => (
+                  <tr key={i}>
+                    <td>{r.date}</td>
+                    <td>{r.type}</td>
+                    <td>{r.ref}</td>
+                    <td>{r.name}</td>
+                    <td className="text-end" style={{ color: '#059669' }}>{r.inflow ? formatCurrency(r.inflow) : '—'}</td>
+                    <td className="text-end" style={{ color: '#dc2626' }}>{r.outflow ? formatCurrency(r.outflow) : '—'}</td>
+                    <td className="text-end"><strong>{formatCurrency(r.balance)}</strong></td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr><td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8' }}>No movements after OB date</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
