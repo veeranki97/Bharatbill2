@@ -1051,7 +1051,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
             <li><strong>Low-stock alert</strong> — appears when any product is at or below your threshold (Settings → Stock alert).</li>
           </ul>
         </HelpButton>
-        <button className="btn btn-primary" onClick={onNew}><Plus size={18} /> New Invoice</button>
+        {listMode ? <button className="btn btn-primary" onClick={onNew}><Plus size={18} /> New Invoice</button> : null}
       </PageHeader>
 
       {overdueBills.length > 0 && (
