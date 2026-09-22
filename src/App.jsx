@@ -42,6 +42,7 @@ const CostCentersView = lazy(() => import('./components/CostCentersView'));
 const ChartOfAccountsView = lazy(() => import('./components/ChartOfAccountsView'));
 const GeneralLedgerView = lazy(() => import('./components/GeneralLedgerView'));
 const PaymentReconView = lazy(() => import('./components/PaymentReconView'));
+const FinancialBooksView = lazy(() => import('./components/FinancialBooksView'));
 import { getPrintSettings } from './utils/printSettings';
 
 // v1.10.4 — Lightweight Suspense fallback shown while a lazy view
@@ -526,6 +527,7 @@ function App() {
     { id: 'coa', icon: BookOpen, label: 'Chart of Accounts', module: 'reports', group: 'Books' },
     { id: 'costcenters', icon: Building2, label: 'Cost Centers', module: 'settings', group: 'Books' },
     { id: 'generalledger', icon: BookOpen, label: 'General Ledger', module: 'reports', group: 'Books' },
+    { id: 'finbooks', icon: BookOpen, label: 'Trial Balance / BS', module: 'reports', group: 'Books' },
     { id: 'reports', icon: BarChart3, label: 'Reports', module: 'reports', group: 'Compliance' },
     { id: 'filing', icon: BookOpen, label: 'GST Returns', module: 'gstReturns', group: 'Compliance' },
     { id: 'incometax', icon: Calculator, label: 'Income Tax', module: 'incomeTax', group: 'Compliance' },
@@ -1023,6 +1025,9 @@ function App() {
         )}
         {currentView === 'generalledger' && (
           <GeneralLedgerView key={businessKey} />
+        )}
+        {currentView === 'finbooks' && (
+          <Suspense fallback={<ViewLoading />}><FinancialBooksView key={businessKey} /></Suspense>
         )}
         {currentView === 'payrecon' && (
           <PaymentReconView key={businessKey} />

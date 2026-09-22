@@ -184,14 +184,42 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
   // the table underneath showed only one.
   const stats = useMemo(() => {
     const byCurrency = {};
+    const byMonth = {};
+    const byClient = {};
+    const aging = { notDue: 0, d0_30: 0, d31_60: 0, d61_90: 0, d90p: 0 };
+    const today = new Date();
+    today.setHours(0,0,0,0);
     for (const b of bills) {
+      if ((b.invoiceType || '').toLowerCase().includes('proforma') || (b.invoiceType || '').toLowerCase().includes('quotation')) continue;
       const cur = b.currency || b.data?.invoiceOptions?.currency || 'INR';
       if (!byCurrency[cur]) byCurrency[cur] = { total: 0, tax: 0, unpaid: 0 };
       byCurrency[cur].total += b.totalAmount || 0;
       byCurrency[cur].tax += b.totalTaxAmount || 0;
-      if (b.status !== 'paid') byCurrency[cur].unpaid += (b.totalAmount || 0) - (b.paidAmount || 0);
+      const due = (b.totalAmount || 0) - (b.paidAmount || 0);
+      if (b.status !== 'paid' && due > 0.01) {
+        byCurrency[cur].unpaid += due;
+        const dueDate = b.data?.details?.dueDate || b.dueDate || b.data?.details?.invoiceDate;
+        if (dueDate) {
+          const dd = new Date(dueDate);
+          const days = Math.floor((today - dd) / 86400000);
+          if (days < 0) aging.notDue += due;
+          else if (days <= 30) aging.d0_30 += due;
+          else if (days <= 60) aging.d31_60 += due;
+          else if (days <= 90) aging.d61_90 += due;
+          else aging.d90p += due;
+        } else aging.d0_30 += due;
+      }
+      const idate = b.data?.details?.invoiceDate || b.invoiceDate || '';
+      if (idate.length >= 7) {
+        const m = idate.slice(0, 7);
+        byMonth[m] = (byMonth[m] || 0) + (b.totalAmount || 0);
+      }
+      const cn = b.clientName || b.data?.client?.name || 'Unknown';
+      byClient[cn] = (byClient[cn] || 0) + (b.totalAmount || 0);
     }
-    return { byCurrency, count: bills.length };
+    const monthKeys = Object.keys(byMonth).sort().slice(-6);
+    const topClients = Object.entries(byClient).sort((a,b) => b[1]-a[1]).slice(0, 5);
+    return { byCurrency, count: bills.length, byMonth, monthKeys, topClients, aging };
   }, [bills]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -1170,6 +1198,66 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
         </div>
       </div>
 )}
+      {/* KPI charts (home only) */}
+      {!listMode && stats.monthKeys?.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
+          <div className="glass-panel p-4">
+            <h3 style={{ margin: '0 0 12px', fontSize: 14 }}>Sales trend (6 months)</h3>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 120 }}>
+              {stats.monthKeys.map(m => {
+                const max = Math.max(...stats.monthKeys.map(k => stats.byMonth[k] || 0), 1);
+                const h = Math.round(((stats.byMonth[m] || 0) / max) * 100);
+                return (
+                  <div key={m} style={{ flex: 1, textAlign: 'center' }}>
+                    <div title={formatCurrency(stats.byMonth[m] || 0)} style={{
+                      height: Math.max(h, 4), background: 'linear-gradient(180deg,#3b82f6,#1d4ed8)',
+                      borderRadius: '6px 6px 0 0', marginBottom: 4,
+                    }} />
+                    <div style={{ fontSize: 10, color: '#64748b' }}>{m.slice(5)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="glass-panel p-4">
+            <h3 style={{ margin: '0 0 12px', fontSize: 14 }}>Outstanding aging</h3>
+            {[
+              ['Not due', stats.aging?.notDue, '#22c55e'],
+              ['0–30', stats.aging?.d0_30, '#3b82f6'],
+              ['31–60', stats.aging?.d31_60, '#f59e0b'],
+              ['61–90', stats.aging?.d61_90, '#f97316'],
+              ['90+', stats.aging?.d90p, '#ef4444'],
+            ].map(([label, val, color]) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
+                  {label}
+                </span>
+                <strong>{formatCurrency(val || 0)}</strong>
+              </div>
+            ))}
+          </div>
+          <div className="glass-panel p-4">
+            <h3 style={{ margin: '0 0 12px', fontSize: 14 }}>Top clients</h3>
+            {(stats.topClients || []).map(([name, amt]) => (
+              <div key={name} style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>{name}</span>
+                  <span>{formatCurrency(amt)}</span>
+                </div>
+                <div style={{ height: 4, background: '#e2e8f0', borderRadius: 2, marginTop: 2 }}>
+                  <div style={{
+                    height: 4, borderRadius: 2, background: '#8b5cf6',
+                    width: `${Math.round((amt / (stats.topClients[0][1] || 1)) * 100)}%`,
+                  }} />
+                </div>
+              </div>
+            ))}
+            {!(stats.topClients || []).length && <p style={{ color: '#94a3b8', fontSize: 13 }}>No data</p>}
+          </div>
+        </div>
+      )}
+
 
 
       {/* Low Stock Alerts */}

@@ -923,9 +923,79 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
       data-row-density={_ps_final.rowDensity || 'normal'}
       data-header-compact={_ps_final.headerCompact ? '1' : '0'}
       ref={ref} {...(previewOnly ? {} : { id: 'invoice-preview' })} style={finalContainerStyle}>
-      {!hideHeaderBecauseLetterhead && pdfStyle === 'modern' && renderModernHeader()}
-      {!hideHeaderBecauseLetterhead && pdfStyle === 'minimal' && renderMinimalHeader()}
-      {!hideHeaderBecauseLetterhead && pdfStyle === 'classic' && renderClassicHeader()}
+
+      {/* ===== SAI DURGA PIXEL LAYOUT (Print Settings → Sai Durga preset) ===== */}
+      {pdfStyleVariant === 'saidurga' && !isThermal && (
+        <div className="sd-invoice" style={{ fontFamily: 'Helvetica, Arial, sans-serif', fontSize: '11px', color: '#111', border: '2px solid #111' }}>
+          <div style={{ textAlign: 'center', borderBottom: '2px solid #111', padding: '10px 8px' }}>
+            <div style={{ fontSize: '20px', fontWeight: 800, letterSpacing: 1 }}>{profile?.businessName || 'SAI DURGA'}</div>
+            <div style={{ fontSize: '13px', fontWeight: 700, marginTop: 4, textTransform: 'uppercase' }}>
+              {invoiceType === 'credit-note' || invoiceType === 'Credit Note' ? 'CREDIT NOTE'
+                : invoiceType === 'delivery-challan' || invoiceType === 'Delivery Challan' ? 'DELIVERY CHALLAN'
+                : invoiceType === 'proforma' ? 'PROFORMA INVOICE'
+                : 'TAX INVOICE'}
+            </div>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5px' }}>
+            <tbody>
+              <tr>
+                <td style={{ width: '55%', borderRight: '1px solid #111', borderBottom: '1px solid #111', padding: 8, verticalAlign: 'top' }}>
+                  <strong>M/s {profile?.businessName}</strong><br />
+                  {[profile?.address, profile?.city, profile?.state, profile?.pin].filter(Boolean).join(', ')}<br />
+                  {profile?.gstin && <>GSTIN: {profile.gstin}<br /></>}
+                  {profile?.pan && <>PAN: {profile.pan}<br /></>}
+                  {profile?.phone && <>Mobile: {profile.phone}</>}
+                </td>
+                <td style={{ padding: 0, borderBottom: '1px solid #111', verticalAlign: 'top' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <tbody>
+                      <tr><td style={{ borderBottom: '1px solid #111', padding: '4px 8px' }}><strong>Date:</strong> {details?.invoiceDate || ''}</td></tr>
+                      <tr><td style={{ borderBottom: '1px solid #111', padding: '4px 8px' }}><strong>{invoiceType?.includes('credit') ? 'No' : 'Invoice No'}:</strong> {details?.invoiceNumber}</td></tr>
+                      {(details?.periodStart || details?.periodEnd) && (
+                        <tr><td style={{ borderBottom: '1px solid #111', padding: '4px 8px' }}><strong>Bill Period:</strong> {details.periodStart || '—'} to {details.periodEnd || '—'}</td></tr>
+                      )}
+                      {(details?.workOrderNo || details?.orderNo) && (
+                        <tr><td style={{ padding: '4px 8px' }}><strong>Order No:</strong> {details.workOrderNo || details.orderNo}</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style={{ borderRight: '1px solid #111', borderBottom: '1px solid #111', padding: 8, verticalAlign: 'top' }}>
+                  <strong>Billing To:</strong><br />
+                  <strong>{client?.name}</strong><br />
+                  {[client?.address, client?.city, client?.state, client?.pin].filter(Boolean).join(', ')}<br />
+                  {client?.gstin && <>GSTIN: {client.gstin}<br /></>}
+                  State: {client?.state || details?.placeOfSupply || '—'}
+                </td>
+                <td style={{ borderBottom: '1px solid #111', padding: 8, verticalAlign: 'top' }}>
+                  <strong>Shipping To:</strong><br />
+                  {details?.shipToSameAsBilling === false ? (
+                    <>
+                      {[details?.shippingAddress, details?.shippingCity, details?.shippingState, details?.shippingPin].filter(Boolean).join(', ') || client?.name}<br />
+                    </>
+                  ) : (
+                    <><strong>{client?.name}</strong><br />{[client?.address, client?.city].filter(Boolean).join(', ')}<br /></>
+                  )}
+                  Place of Supply: {details?.placeOfSupply || client?.state || '—'}
+                </td>
+              </tr>
+              {details?.workDetails && (
+                <tr>
+                  <td colSpan={2} style={{ borderBottom: '1px solid #111', padding: 8 }}>
+                    <strong>Work Details:</strong> {details.workDetails}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!hideHeaderBecauseLetterhead && pdfStyleVariant !== 'saidurga' && pdfStyle === 'modern' && renderModernHeader()}
+      {!hideHeaderBecauseLetterhead && pdfStyleVariant !== 'saidurga' && pdfStyle === 'minimal' && renderMinimalHeader()}
+      {!hideHeaderBecauseLetterhead && pdfStyleVariant !== 'saidurga' && pdfStyle === 'classic' && renderClassicHeader()}
 
       {renderParties()}
 

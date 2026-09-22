@@ -627,14 +627,26 @@ app.get('/api/accounts', (req, res) => {
     if (!list.length) {
       const seed = [
         { id: 'acc_assets', name: 'Assets', type: 'Assets', parentId: null, leaf: false },
-        { id: 'acc_bank', name: 'Bank', type: 'Assets', parentId: 'acc_assets', leaf: true },
+        { id: 'acc_current_assets', name: 'Current Assets', type: 'Assets', parentId: 'acc_assets', leaf: false },
+        { id: 'acc_bank', name: 'Bank', type: 'Assets', parentId: 'acc_current_assets', leaf: true },
+        { id: 'acc_cash', name: 'Cash', type: 'Assets', parentId: 'acc_current_assets', leaf: true },
+        { id: 'acc_debtors', name: 'Sundry Debtors', type: 'Assets', parentId: 'acc_current_assets', leaf: true },
+        { id: 'acc_itc_cgst', name: 'Input CGST', type: 'Assets', parentId: 'acc_current_assets', leaf: true },
+        { id: 'acc_itc_sgst', name: 'Input SGST', type: 'Assets', parentId: 'acc_current_assets', leaf: true },
+        { id: 'acc_itc_igst', name: 'Input IGST', type: 'Assets', parentId: 'acc_current_assets', leaf: true },
         { id: 'acc_liab', name: 'Liabilities', type: 'Liabilities', parentId: null, leaf: false },
+        { id: 'acc_creditors', name: 'Sundry Creditors', type: 'Liabilities', parentId: 'acc_liab', leaf: true },
+        { id: 'acc_out_cgst', name: 'Output CGST', type: 'Liabilities', parentId: 'acc_liab', leaf: true },
+        { id: 'acc_out_sgst', name: 'Output SGST', type: 'Liabilities', parentId: 'acc_liab', leaf: true },
+        { id: 'acc_out_igst', name: 'Output IGST', type: 'Liabilities', parentId: 'acc_liab', leaf: true },
         { id: 'acc_equity', name: 'Equity', type: 'Equity', parentId: null, leaf: false },
+        { id: 'acc_capital', name: 'Capital', type: 'Equity', parentId: 'acc_equity', leaf: true },
         { id: 'acc_re', name: 'Retained Earnings', type: 'Equity', parentId: 'acc_equity', leaf: true },
         { id: 'acc_income', name: 'Income', type: 'Income', parentId: null, leaf: false },
         { id: 'acc_sales', name: 'Sales', type: 'Income', parentId: 'acc_income', leaf: true },
         { id: 'acc_exp', name: 'Expense', type: 'Expense', parentId: null, leaf: false },
         { id: 'acc_direct', name: 'Direct Costs', type: 'Expense', parentId: 'acc_exp', leaf: true },
+        { id: 'acc_indirect', name: 'Indirect Expenses', type: 'Expense', parentId: 'acc_exp', leaf: true },
       ];
       const dir = path.join(DATA_DIR, 'accounts');
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

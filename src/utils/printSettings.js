@@ -133,7 +133,7 @@ export const DEFAULT_PRINT_SETTINGS = {
   // paths exist: `corporate` → classic + CSS class variant,
   // `minimalist` → minimal + CSS class variant. See InvoicePreview.jsx
   // `pdfStyleRaw` mapping (audit L8 comment fix). --
-  pdfTemplate: 'modern',     // 'modern' | 'classic' | 'minimal' | 'corporate' | 'minimalist'
+  pdfTemplate: 'saidurga',   // 'saidurga' | 'modern' | 'classic' | 'minimal' | 'corporate' | 'minimalist'
 
   // -- Company letterhead --
   letterheadEnabled: false,
