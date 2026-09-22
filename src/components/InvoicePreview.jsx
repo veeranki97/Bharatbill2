@@ -11,7 +11,7 @@ import { getPrintSettings, getLabel } from '../utils/printSettings';
 // instance renders with previewOnly=true so it doesn't create a
 // duplicate id on the page — HTML-invalid + could confuse getElementById
 // lookups.
-const InvoicePreview = React.forwardRef(({ profile, client, details, items, totals, invoiceType = 'tax-invoice', customTerms, customNotes, extraSections = [], options = {}, previewOnly = false }, ref) => {
+const InvoicePreview = React.forwardRef(({ profile, client, details, items, totals, invoiceType = 'tax-invoice', customTerms, customNotes, extraSections = [], options = {}, previewOnly = false, documentFingerprint = '' }, ref) => {
   // Interstate detection must match InvoiceGenerator.jsx — it honours
   // details.placeOfSupply (POS override) and client.isSEZ (SEZ supplies
   // are always interstate regardless of physical state). Without this
@@ -37,6 +37,33 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
       || !!client?.isSEZ
       || (details?.placeOfSupply && businessState && details.placeOfSupply.toLowerCase() !== businessState)
       || (businessState && clientState && businessState !== clientState));
+  
+  // P0: SHA-256 style fingerprint (sync fallback using simple hash of key fields;
+  // parent may pass a true crypto digest via documentFingerprint prop)
+  const [autoFingerprint, setAutoFingerprint] = React.useState('');
+  React.useEffect(() => {
+    if (documentFingerprint) { setAutoFingerprint(documentFingerprint); return; }
+    const payload = JSON.stringify({
+      inv: details?.invoiceNumber, date: details?.invoiceDate,
+      client: client?.name, gstin: client?.gstin, total: totals?.total,
+      items: (items || []).map(i => [i.name, i.quantity, i.rate, i.hsn]),
+    });
+    (async () => {
+      try {
+        const buf = new TextEncoder().encode(payload);
+        const hash = await crypto.subtle.digest('SHA-256', buf);
+        const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+        setAutoFingerprint(hex);
+      } catch {
+        // Fallback non-crypto fingerprint
+        let h = 0;
+        for (let i = 0; i < payload.length; i++) h = ((h << 5) - h) + payload.charCodeAt(i) | 0;
+        setAutoFingerprint('local-' + Math.abs(h).toString(16));
+      }
+    })();
+  }, [documentFingerprint, details?.invoiceNumber, details?.invoiceDate, client?.name, totals?.total, items]);
+  const documentFingerprintResolved = documentFingerprint || autoFingerprint;
+
   const typeConfig = INVOICE_TYPES[invoiceType] || INVOICE_TYPES['tax-invoice'];
   // Seller's country drives tax label (GST / VAT / SST / MwSt etc.) and bank label.
   const sellerCC = getCountryConfig(profile?.country);
@@ -221,6 +248,9 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
           )}
           {(details?.site || client?.site) && (
             <span><strong style={{ color: '#64748b' }}>Site</strong> {details?.site || client?.site}</span>
+          )}
+          {details?.workDetails && (
+            <span style={{ display: 'block', marginTop: 4 }}><strong style={{ color: '#64748b' }}>Work Details</strong> {details.workDetails}</span>
           )}
           {showDueDate && details?.dueDate && <span><strong style={{ color: '#64748b' }}>Due</strong> {new Date(details.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>}
           {showReverseChargeLine && <span><strong style={{ color: '#64748b' }}>Reverse Charge</strong> {reverseChargeText}</span>}
@@ -751,6 +781,14 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
         {footerMessage && (
           <div style={{ padding: '6px 4px 6px', textAlign: 'center', fontSize: '0.95em', fontWeight: strongWeight }}>
             {cap(`*** ${footerMessage} ***`)}
+        {/* P0 SD Dynamics parity: computer-generated + timestamp + optional SHA */}
+        <div style={{ padding: '8px 12px', textAlign: 'center', fontSize: '0.68rem', color: '#64748b', fontStyle: 'italic', borderTop: '1px dashed #e2e8f0', marginTop: '0.5rem' }}>
+          This is a Computer Generated Transaction — Generated on {new Date().toLocaleString('en-IN')}
+          {documentFingerprintResolved ? (
+            <><br />🔒 SHA-256 Digital Fingerprint: <span style={{ fontFamily: 'monospace', fontSize: '0.62rem' }}>{documentFingerprintResolved}</span></>
+          ) : null}
+        </div>
+
             {profile?.email && <div style={{ fontWeight: baseWeight, marginTop: 2 }}>{cap(profile.email)}</div>}
           </div>
         )}
