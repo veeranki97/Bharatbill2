@@ -36,7 +36,7 @@ export default function InventoryView() {
       const data = await getAllProducts();
       setProducts(data);
     } catch {
-      toast('Failed to load products', 'error');
+      toast('Failed to load services', 'error');
     }
   };
 
@@ -86,7 +86,7 @@ export default function InventoryView() {
 
   const handleSave = async () => {
     if (!form.name.trim()) {
-      toast('Product name is required', 'warning');
+      toast('Service name is required', 'warning');
       return;
     }
     try {
@@ -96,6 +96,7 @@ export default function InventoryView() {
       const purchasePrice = form.purchasePrice ? parseFloat(form.purchasePrice) : 0;
       const product = {
         ...(editingId ? { id: editingId } : {}),
+        isService: true,
         name: form.name.trim(),
         hsn: form.hsn.trim(),
         purchasePrice,
@@ -111,14 +112,14 @@ export default function InventoryView() {
       closeForm();
       loadProducts();
     } catch {
-      toast('Failed to save product', 'error');
+      toast('Failed to save service', 'error');
     }
   };
 
   const handleDelete = async (id) => {
     if (await confirmAction({
-      title: 'Delete this product?',
-      message: 'Existing invoices that used this product keep their line items unchanged. This just removes the product from your catalog.',
+      title: 'Delete this service?',
+      message: 'Existing invoices that used this service keep their line items unchanged. This just removes the product from your service list.',
       confirmLabel: 'Delete',
       tone: 'danger',
     })) {
@@ -179,7 +180,7 @@ export default function InventoryView() {
         });
         imported++;
       }
-      toast(`Imported ${imported} product${imported !== 1 ? 's' : ''}`, 'success');
+      toast(`Imported ${imported} service${imported !== 1 ? 's' : ''}`, 'success');
       loadProducts();
     } catch {
       toast('Failed to parse CSV file', 'error');
@@ -192,7 +193,7 @@ export default function InventoryView() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Inventory</h1>
-          <p className="page-subtitle">Manage your products and services catalog</p>
+          <p className="page-subtitle">Service master — rates, SAC/HSN, units. Pick on invoice lines to auto-fill.</p>
         </div>
         <div className="flex gap-2">
           <input type="file" accept=".csv" ref={csvInputRef} style={{ display: 'none' }} onChange={handleCSVImport} />
@@ -200,7 +201,7 @@ export default function InventoryView() {
             <Upload size={16} /> Import CSV
           </button>
           <button className="btn btn-primary" onClick={openAdd}>
-            <Plus size={18} /> Add Product
+            <Plus size={18} /> Add Service
           </button>
         </div>
       </div>
@@ -209,7 +210,7 @@ export default function InventoryView() {
       <div className="glass-panel p-4 mb-6">
         <div className="search-box" style={{ maxWidth: '400px' }}>
           <Search size={16} className="search-icon" />
-          <input type="text" placeholder="Search by name or HSN..." value={search}
+          <input type="text" placeholder="Search by name or SAC/HSN..." value={search}
             onChange={e => setSearch(e.target.value)} className="search-input" />
           {search && <button className="icon-btn" onClick={() => setSearch('')} title="Clear search" aria-label="Clear search"><X size={14} /></button>}
         </div>
@@ -219,7 +220,7 @@ export default function InventoryView() {
       {showForm && (
         <div className="modal-overlay" onClick={closeForm}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h3 className="section-title">{editingId ? 'Edit Product' : 'Add Product'}</h3>
+            <h3 className="section-title">{editingId ? 'Edit Service' : 'Add Service'}</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
                 <label className="form-label">Product / Service Name *</label>
@@ -287,13 +288,13 @@ export default function InventoryView() {
 
       {/* Product Table */}
       <div className="glass-panel">
-        <div className="table-header"><h3>Products & Services</h3></div>
+        <div className="table-header"><h3>Services</h3></div>
         {filtered.length === 0 ? (
           <div className="empty-state">
             <Package size={48} />
             <p>{products.length === 0 ? 'No products yet. Add your first product.' : 'No products match your search.'}</p>
             {products.length === 0 && (
-              <button className="btn btn-primary" onClick={openAdd}><Plus size={18} /> Add Product</button>
+              <button className="btn btn-primary" onClick={openAdd}><Plus size={18} /> Add Service</button>
             )}
           </div>
         ) : (
