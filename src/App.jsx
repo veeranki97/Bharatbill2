@@ -484,6 +484,7 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentView, JSON.stringify(enabledModules)]);
 
+<<<<<<< HEAD
   const navItems = [
     { id: 'dashboard', icon: Home, label: 'Dashboard', module: 'dashboard' },
     { id: 'invoices', icon: FileText, label: 'Invoices', module: 'invoicing' },
@@ -506,6 +507,31 @@ function App() {
     { id: 'filing', icon: BookOpen, label: 'GST Returns', module: 'gstReturns' },
     { id: 'incometax', icon: Calculator, label: 'Income Tax', module: 'incomeTax' },
     { id: 'guide', icon: HelpCircle, label: 'User Guide', module: 'dashboard' }, // gated by dashboard so it's always available
+=======
+  // P1: Grouped navigation (Sales / Orders / Parties / Money / Books / Compliance)
+  const navItems = [
+    { id: 'dashboard', icon: Home, label: 'Dashboard', module: 'dashboard', group: 'Home' },
+    { id: 'invoices', icon: FileText, label: 'Invoices', module: 'invoicing', group: 'Sales' },
+    { id: 'new', icon: Plus, label: 'New Invoice', onClick: handleNewInvoice, module: 'invoicing', group: 'Sales' },
+    { id: 'recurring', icon: RefreshCw, label: 'Recurring', module: 'recurring', group: 'Sales' },
+    { id: 'workorders', icon: ClipboardList, label: 'Work Orders', module: 'dashboard', group: 'Orders' },
+    { id: 'purchaseorders', icon: ShoppingBag, label: 'Purchase Orders', module: 'purchases', group: 'Orders' },
+    { id: 'clients', icon: Users, label: 'Clients', module: 'clients', group: 'Parties' },
+    { id: 'vendors', icon: Users, label: 'Vendors', module: 'clients', group: 'Parties' },
+    { id: 'receipts', icon: Receipt, label: 'Receipts', module: 'receipts', group: 'Money' },
+    { id: 'payrecon', icon: Receipt, label: 'Payment Recon', module: 'reports', group: 'Money' },
+    { id: 'cashbook', icon: Banknote, label: 'Cash Book', module: 'reports', group: 'Money' },
+    { id: 'expenses', icon: Wallet, label: 'Expenses', module: 'expenses', group: 'Money' },
+    { id: 'purchases', icon: ShoppingCart, label: 'Purchases', module: 'purchases', group: 'Purchases' },
+    { id: 'coa', icon: BookOpen, label: 'Chart of Accounts', module: 'reports', group: 'Books' },
+    { id: 'costcenters', icon: Building2, label: 'Cost Centers', module: 'settings', group: 'Books' },
+    { id: 'generalledger', icon: BookOpen, label: 'General Ledger', module: 'reports', group: 'Books' },
+    { id: 'reports', icon: BarChart3, label: 'Reports', module: 'reports', group: 'Compliance' },
+    { id: 'filing', icon: BookOpen, label: 'GST Returns', module: 'gstReturns', group: 'Compliance' },
+    { id: 'incometax', icon: Calculator, label: 'Income Tax', module: 'incomeTax', group: 'Compliance' },
+    { id: 'inventory', icon: Package, label: 'Services', module: 'inventory', group: 'System' },
+    { id: 'guide', icon: HelpCircle, label: 'User Guide', module: 'dashboard', group: 'System' },
+>>>>>>> 3f3c45d7c8ea71d2a90deab77cf2730ac0ab4eae
   ].filter(item => showIfModule(item.module));
 
   // Command palette actions — declared here (not earlier) because the deps
@@ -818,6 +844,7 @@ function App() {
         </div>
 
         <nav className="sidebar-nav">
+<<<<<<< HEAD
           {navItems.map(item => (
             <button
               key={item.id}
@@ -827,6 +854,29 @@ function App() {
               <item.icon size={18} /> <span className="nav-label">{item.label}</span>
             </button>
           ))}
+=======
+          {navItems.map((item, idx) => {
+            const prevGroup = idx > 0 ? navItems[idx - 1].group : null;
+            const showGroup = item.group && item.group !== prevGroup;
+            return (
+              <div key={item.id}>
+                {showGroup && (
+                  <div className="nav-label" style={{
+                    fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em',
+                    textTransform: 'uppercase', color: 'var(--text-muted, #94a3b8)',
+                    padding: '0.65rem 0.85rem 0.25rem', opacity: sidebarCollapsed && !sidebarHovered ? 0 : 1,
+                  }}>{item.group}</div>
+                )}
+                <button
+                  className={`nav-btn ${currentView === item.id ? 'nav-btn-active' : ''}`}
+                  onClick={item.onClick || (() => setCurrentView(item.id))}
+                >
+                  <item.icon size={18} /> <span className="nav-label">{item.label}</span>
+                </button>
+              </div>
+            );
+          })}
+>>>>>>> 3f3c45d7c8ea71d2a90deab77cf2730ac0ab4eae
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             {/* Update-available banner — only shows when GitHub has a newer version
                 AND the user hasn't already dismissed THIS specific version. New

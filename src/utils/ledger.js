@@ -77,3 +77,38 @@ export function trialBalance(journals) {
   });
   return Object.values(map).sort((a, b) => a.account.localeCompare(b.account));
 }
+
+
+/** Period freeze (Settings stores fgsb_freeze_days in localStorage) */
+export function isPeriodFrozen(dateStr) {
+  try {
+    const freezeDays = Number(localStorage.getItem('fgsb_freeze_days') || '0');
+    if (!freezeDays || !dateStr) return false;
+    const invD = new Date(dateStr);
+    const diff = Math.floor((Date.now() - invD.getTime()) / 86400000);
+    return diff > freezeDays;
+  } catch {
+    return false;
+  }
+}
+
+/** Trading / P&L aggregates from journals (P2) */
+export function computeTradingPnL(journals, fromDate, toDate) {
+  let sales = 0, purchases = 0, expenses = 0;
+  (journals || []).forEach(j => {
+    const d = j.date || '';
+    if (fromDate && d < fromDate) return;
+    if (toDate && d > toDate) return;
+    (j.entries || []).forEach(e => {
+      const acc = (e.account || '').toLowerCase();
+      const cr = Number(e.credit || 0);
+      const dr = Number(e.debit || 0);
+      if (acc.includes('sales')) sales += cr;
+      if (acc.includes('purchase')) purchases += dr;
+      if (acc.includes('expense') || acc.includes('salary') || acc.includes('rent')) expenses += dr;
+    });
+  });
+  const grossProfit = sales - purchases;
+  const netProfit = grossProfit - expenses;
+  return { sales, purchases, expenses, grossProfit, netProfit };
+}

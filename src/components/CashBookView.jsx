@@ -133,17 +133,18 @@ export default function CashBookView() {
 
       {tab === 'ledger' && (
         <>
-          <div className="glass-panel p-4 mb-4" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'end' }}>
-            <div className="form-group">
-              <label className="form-label">Opening balance (₹)</label>
-              <input type="number" className="form-input" value={ob} onChange={e => setOb(Number(e.target.value) || 0)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">As of date</label>
-              <input type="date" className="form-input" value={obDate} onChange={e => setObDate(e.target.value)} />
-            </div>
-            <button type="button" className="btn btn-primary" onClick={saveOb}>Save OB</button>
-            <div style={{ marginLeft: 'auto', fontWeight: 700 }}>
+          <div className="glass-panel" style={{
+            display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center',
+            padding: '0.65rem 1rem', marginBottom: '0.75rem',
+          }}>
+            <label className="form-label" style={{ margin: 0, whiteSpace: 'nowrap' }}>Opening balance (₹)</label>
+            <input type="number" className="form-input" style={{ width: 140, margin: 0 }}
+              value={ob} onChange={e => setOb(Number(e.target.value) || 0)} />
+            <label className="form-label" style={{ margin: 0, whiteSpace: 'nowrap' }}>As of</label>
+            <input type="date" className="form-input" style={{ width: 150, margin: 0 }}
+              value={obDate} onChange={e => setObDate(e.target.value)} />
+            <button type="button" className="btn btn-primary btn-sm" onClick={saveOb}>Save OB</button>
+            <div style={{ marginLeft: 'auto', fontWeight: 700, fontSize: '0.95rem' }}>
               Closing: {formatCurrency(closing)}
             </div>
           </div>

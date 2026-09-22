@@ -558,6 +558,10 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     dueDate: '',
     placeOfSupply: '',
     originalInvoiceRef: '',
+    periodStart: '',
+    periodEnd: '',
+    workDetails: '',
+    site: '',
     // v1.10.11 — Ship To fields. Default: same as billing (no extra
     // fields shown). Untick to type a separate delivery address.
     shipToSameAsBilling: true,
@@ -1589,7 +1593,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       lastPrintedAt: extraPatch.lastPrintedAt ?? editingBill?.lastPrintedAt ?? null,
       // Work Order link (custom) — used by budget ceiling check
       workOrderId: selectedWorkOrderId || undefined,
-      data: { profile, client, details: { ...details, invoiceNumber: finalInvoiceNumber, periodStart: details.periodStart || '', periodEnd: details.periodEnd || '', site: client.site || '' }, items, totals, invoiceType, customTerms, customNotes, internalNote, extraSections, invoiceOptions: invoiceOptionsWithSnapshot, taxInclusive, workOrderId: selectedWorkOrderId || undefined, site: client.site || '' }
+      data: { profile, client, details: { ...details, invoiceNumber: finalInvoiceNumber, periodStart: details.periodStart || '', periodEnd: details.periodEnd || '', workDetails: details.workDetails || '', workOrderNo: details.workOrderNo || '', site: client.site || details.site || '' }, items, totals, invoiceType, customTerms, customNotes, internalNote, extraSections, invoiceOptions: invoiceOptionsWithSnapshot, taxInclusive, workOrderId: selectedWorkOrderId || undefined, site: client.site || '' }
     };
     // Editing an existing bill → always overwrite. NEW bill on second-and-
     // later save this session → also overwrite (same invoice number, would
@@ -1639,7 +1643,31 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       toast('Invoice date cannot be in the future', 'error');
       return;
     }
+    // P0: Future invoice dates strictly restricted (SD Dynamics parity)
+    if (details.invoiceDate) {
+      const invD = new Date(details.invoiceDate);
+      invD.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (invD > today) {
+        toast('Future invoice dates are not allowed', 'error');
+        return;
+      }
+    }
+    // P2: Period freeze (Settings → freezeDays)
+    try {
+      const freezeDays = Number(localStorage.getItem('fgsb_freeze_days') || '0');
+      if (freezeDays > 0 && details.invoiceDate) {
+        const invD = new Date(details.invoiceDate);
+        const diff = Math.floor((Date.now() - invD.getTime()) / 86400000);
+        if (diff > freezeDays) {
+          toast(`Period freeze: cannot edit invoices older than ${freezeDays} days`, 'error');
+          return;
+        }
+      }
+    } catch { /* ignore */ }
     if (details.periodStart && details.periodEnd) {
+
       if (new Date(details.periodStart) > new Date(details.periodEnd)) {
         toast('Bill Period Start must be on or before Bill Period End', 'error');
         return;
@@ -3874,13 +3902,14 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                   if (wo.site) {
                     setClient(prev => ({ ...prev, site: wo.site }));
                   }
-                  if (wo.periodStart || wo.periodEnd) {
-                    setDetails(prev => ({
-                      ...prev,
-                      periodStart: wo.periodStart || prev.periodStart || '',
-                      periodEnd: wo.periodEnd || prev.periodEnd || '',
-                    }));
-                  }
+                  setDetails(prev => ({
+                    ...prev,
+                    periodStart: wo.periodStart || prev.periodStart || '',
+                    periodEnd: wo.periodEnd || prev.periodEnd || '',
+                    workDetails: prev.workDetails || wo.desc || wo.description || prev.workDetails || '',
+                    site: wo.site || prev.site || '',
+                    workOrderNo: wo.woNumber || wo.woNo || wo.number || prev.workOrderNo || '',
+                  }));
                   if (wo.items && wo.items.length) {
                     const mapped = woItemsToInvoiceItems(wo.items, allBillsForCredit, wo);
                     if (mapped.length) setItems(mapped);
@@ -3934,6 +3963,17 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 <input type="date" className="form-input"
                   value={details.periodEnd || ''}
                   onChange={(e) => setDetails({ ...details, periodEnd: e.target.value })} />
+              </div>
+
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">Work Details</label>
+                <textarea
+                  className="form-input"
+                  rows={2}
+                  value={details.workDetails || ''}
+                  onChange={(e) => setDetails({ ...details, workDetails: e.target.value })}
+                  placeholder="Scope / site notes for this bill period (printed on invoice)"
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">E-Way Bill No (goods only; threshold in Settings)</label>

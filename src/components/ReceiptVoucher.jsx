@@ -67,7 +67,7 @@ export default function ReceiptVoucher() {
   // which raced under concurrent saves + two tabs.
   const getNextReceiptNo = async () => {
     try {
-      return await getNextInvoiceNumber('RCP', { peek: true });
+      return await getNextInvoiceNumber('ADV', { peek: true });
     } catch {
       // Fallback preserves old behaviour if server is offline mid-mount
       const count = receipts.length + 1;
@@ -139,7 +139,7 @@ export default function ReceiptVoucher() {
       let receiptNo = form.receiptNo;
       if (!editingId) {
         try {
-          receiptNo = await getNextInvoiceNumber('RCP');
+          receiptNo = await getNextInvoiceNumber('ADV');
         } catch { /* fall back to peeked number */ }
       }
 
@@ -320,7 +320,7 @@ export default function ReceiptVoucher() {
       }
       // Master receipt for audit
       try {
-        const receiptNo = await getNextInvoiceNumber('RCP');
+        const receiptNo = await getNextInvoiceNumber('ADV');
         await saveReceipt({
           date: today,
           receiptNo,
