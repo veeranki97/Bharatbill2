@@ -1593,7 +1593,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       lastPrintedAt: extraPatch.lastPrintedAt ?? editingBill?.lastPrintedAt ?? null,
       // Work Order link (custom) — used by budget ceiling check
       workOrderId: selectedWorkOrderId || undefined,
-      data: { profile, client, details: { ...details, invoiceNumber: finalInvoiceNumber, periodStart: details.periodStart || '', periodEnd: details.periodEnd || '', workDetails: details.workDetails || '', site: client.site || details.site || '' }, items, totals, invoiceType, customTerms, customNotes, internalNote, extraSections, invoiceOptions: invoiceOptionsWithSnapshot, taxInclusive, workOrderId: selectedWorkOrderId || undefined, site: client.site || '' }
+      data: { profile, client, details: { ...details, invoiceNumber: finalInvoiceNumber, periodStart: details.periodStart || '', periodEnd: details.periodEnd || '', workDetails: details.workDetails || '', workOrderNo: details.workOrderNo || '', site: client.site || details.site || '' }, items, totals, invoiceType, customTerms, customNotes, internalNote, extraSections, invoiceOptions: invoiceOptionsWithSnapshot, taxInclusive, workOrderId: selectedWorkOrderId || undefined, site: client.site || '' }
     };
     // Editing an existing bill → always overwrite. NEW bill on second-and-
     // later save this session → also overwrite (same invoice number, would
@@ -3908,6 +3908,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                     periodEnd: wo.periodEnd || prev.periodEnd || '',
                     workDetails: prev.workDetails || wo.desc || wo.description || prev.workDetails || '',
                     site: wo.site || prev.site || '',
+                    workOrderNo: wo.woNumber || wo.woNo || wo.number || prev.workOrderNo || '',
                   }));
                   if (wo.items && wo.items.length) {
                     const mapped = woItemsToInvoiceItems(wo.items, allBillsForCredit, wo);
