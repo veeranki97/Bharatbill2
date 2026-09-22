@@ -244,7 +244,10 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
           {showInvoiceNumber && <span><strong style={{ color: '#64748b' }}>No.</strong> {details?.invoiceNumber}</span>}
           {showInvoiceDate && <span><strong style={{ color: '#64748b' }}>Date</strong> {details?.invoiceDate ? new Date(details.invoiceDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}</span>}
           {(details?.periodStart || details?.periodEnd) && (
-            <span><strong style={{ color: '#64748b' }}>Period</strong> {details.periodStart || '—'} to {details.periodEnd || '—'}</span>
+            <span><strong style={{ color: '#64748b' }}>Bill Period</strong> {details.periodStart || '—'} to {details.periodEnd || '—'}</span>
+          )}
+          {(details?.workOrderNo || details?.orderNo || options?.workOrderNo) && (
+            <span><strong style={{ color: '#64748b' }}>Order No</strong> {details?.workOrderNo || details?.orderNo || options?.workOrderNo}</span>
           )}
           {(details?.site || client?.site) && (
             <span><strong style={{ color: '#64748b' }}>Site</strong> {details?.site || client?.site}</span>
@@ -1320,7 +1323,8 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
           if (!showSignature || !sigImg) return null;
           return (
             <div className="inv-signature">
-              {showSignatoryText && <p className="inv-sig-label">Authorized Signatory</p>}
+              {showSignatoryText && <p className="inv-sig-label">Authorized Signatory
+            <div style={{ color: '#16a34a', fontSize: '0.72rem', fontWeight: 600, marginTop: 4 }}>✓ Signature Valid</div></p>}
               <img src={sigImg} alt="Signature" style={{
                 maxHeight: '60px', maxWidth: '180px', objectFit: 'contain',
                 display: 'block', marginLeft: 'auto', marginBottom: '0.4rem'
