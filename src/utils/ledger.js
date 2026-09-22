@@ -31,6 +31,7 @@ export function journalFromTaxInvoice(bill) {
   if (sgst > 0) entries.push({ account: ACCOUNTS.SGST_OUT, debit: 0, credit: sgst });
   if (igst > 0) entries.push({ account: ACCOUNTS.IGST_OUT, debit: 0, credit: igst });
 
+  // Balance any paise difference into round-off
   const dr = entries.reduce((s, e) => s + e.debit, 0);
   const cr = entries.reduce((s, e) => s + e.credit, 0);
   const diff = +(dr - cr).toFixed(2);
@@ -76,6 +77,7 @@ export function trialBalance(journals) {
   });
   return Object.values(map).sort((a, b) => a.account.localeCompare(b.account));
 }
+
 
 /** Period freeze (Settings stores fgsb_freeze_days in localStorage) */
 export function isPeriodFrozen(dateStr) {
