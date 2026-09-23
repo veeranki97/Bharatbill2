@@ -3,6 +3,7 @@ import { FileText, Trash2, Plus, IndianRupee, Receipt, Edit3, TrendingUp, Search
 import HelpButton from './HelpButton';
 import { getAllBills, deleteBill, saveBill, getAllProducts, saveProduct, getProfile, getAllClients, getStockAlertSettings, saveReceipt, deleteReceipt, getAllReceipts } from '../store';
 import { formatCurrency, INVOICE_TYPES, getFYOptions, numberToWords, belongsToProfile } from '../utils';
+import { getChartPrefs, THEME_COLORS } from '../utils/chartPrefs';
 import { openWhatsAppShare } from '../utils/share';
 import PageHeader from './PageHeader';
 import { toast } from './Toast';
@@ -182,6 +183,8 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
   // loadBills() from the raw server response, so Total Invoiced, Tax Collected,
   // Outstanding and the invoice count added up EVERY company's invoices while
   // the table underneath showed only one.
+  const chartPrefs = getChartPrefs();
+  const themeColors = THEME_COLORS[chartPrefs.theme] || THEME_COLORS.blue;
   const stats = useMemo(() => {
     const byCurrency = {};
     const byMonth = {};
@@ -1210,7 +1213,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
                 return (
                   <div key={m} style={{ flex: 1, textAlign: 'center' }}>
                     <div title={formatCurrency(stats.byMonth[m] || 0)} style={{
-                      height: Math.max(h, 4), background: 'linear-gradient(180deg,#3b82f6,#1d4ed8)',
+                      height: Math.max(h, 4), background: `linear-gradient(180deg,${themeColors[0]},${themeColors[1]})`,
                       borderRadius: '6px 6px 0 0', marginBottom: 4,
                     }} />
                     <div style={{ fontSize: 10, color: '#64748b' }}>{m.slice(5)}</div>

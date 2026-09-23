@@ -66,7 +66,7 @@ const DESIGN_PRESETS = [
     name: 'Tally Classic',
     label: 'Tally Classic',
     icon: '▣',
-    description: 'Ruled grid, boxed header — traditional Indian print',
+    description: 'Ruled grid, boxed header, CGST/SGST columns — traditional Indian print',
     tag: 'Tally-style · GST',
     settings: {
       pdfTemplate: 'tally',

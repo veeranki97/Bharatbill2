@@ -43,6 +43,8 @@ const ChartOfAccountsView = lazy(() => import('./components/ChartOfAccountsView'
 const GeneralLedgerView = lazy(() => import('./components/GeneralLedgerView'));
 const PaymentReconView = lazy(() => import('./components/PaymentReconView'));
 const FinancialBooksView = lazy(() => import('./components/FinancialBooksView'));
+const BankFeedView = lazy(() => import('./components/BankFeedView'));
+const VoucherEntryView = lazy(() => import('./components/VoucherEntryView'));
 import { getPrintSettings } from './utils/printSettings';
 
 // v1.10.4 — Lightweight Suspense fallback shown while a lazy view
@@ -485,36 +487,12 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentView, JSON.stringify(enabledModules)]);
 
-<<<<<<< HEAD
-  const navItems = [
-    { id: 'dashboard', icon: Home, label: 'Dashboard', module: 'dashboard' },
-    { id: 'invoices', icon: FileText, label: 'Invoices', module: 'invoicing' },
-    { id: 'new', icon: Plus, label: 'New Invoice', onClick: handleNewInvoice, module: 'invoicing' },
-    { id: 'clients', icon: Users, label: 'Clients', module: 'clients' },
-    { id: 'vendors', icon: Users, label: 'Vendors', module: 'clients' },
-    { id: 'inventory', icon: Package, label: 'Products', module: 'inventory' },
-    { id: 'expenses', icon: Wallet, label: 'Expenses', module: 'expenses' },
-    { id: 'purchases', icon: ShoppingCart, label: 'Purchases', module: 'purchases' },
-    { id: 'workorders', icon: ClipboardList, label: 'Work Orders', module: 'dashboard' },
-    { id: 'purchaseorders', icon: ShoppingBag, label: 'Purchase Orders', module: 'purchases' },
-    { id: 'cashbook', icon: Banknote, label: 'Cash Book', module: 'reports' },
-    { id: 'costcenters', icon: Building2, label: 'Cost Centers', module: 'settings' },
-    { id: 'coa', icon: BookOpen, label: 'Chart of Accounts', module: 'reports' },
-    { id: 'generalledger', icon: BookOpen, label: 'General Ledger', module: 'reports' },
-    { id: 'payrecon', icon: Receipt, label: 'Payment Recon', module: 'reports' },
-    { id: 'recurring', icon: RefreshCw, label: 'Recurring', module: 'recurring' },
-    { id: 'receipts', icon: Receipt, label: 'Receipts', module: 'receipts' },
-    { id: 'reports', icon: BarChart3, label: 'Reports', module: 'reports' },
-    { id: 'filing', icon: BookOpen, label: 'GST Returns', module: 'gstReturns' },
-    { id: 'incometax', icon: Calculator, label: 'Income Tax', module: 'incomeTax' },
-    { id: 'guide', icon: HelpCircle, label: 'User Guide', module: 'dashboard' }, // gated by dashboard so it's always available
-=======
   // P1: Grouped navigation (Sales / Orders / Parties / Money / Books / Compliance)
   const navItems = [
     { id: 'dashboard', icon: Home, label: 'Dashboard', module: 'dashboard', group: 'Home' },
     { id: 'invoices', icon: FileText, label: 'Invoices', module: 'invoicing', group: 'Sales' },
-    { id: 'new', icon: Plus, label: 'New Invoice', onClick: handleNewInvoice, module: 'invoicing', group: 'Sales' },
-    { id: 'recurring', icon: RefreshCw, label: 'Recurring', module: 'recurring', group: 'Sales' },
+    { id: 'new', icon: Plus, label: 'New Invoice', onClick: handleNewInvoice, module: 'invoicing', group: 'Sales', parent: 'invoices' },
+    { id: 'recurring', icon: RefreshCw, label: 'Recurring', module: 'recurring', group: 'Sales', parent: 'invoices' },
     { id: 'workorders', icon: ClipboardList, label: 'Work Orders', module: 'dashboard', group: 'Orders' },
     { id: 'purchaseorders', icon: ShoppingBag, label: 'Purchase Orders', module: 'purchases', group: 'Orders' },
     { id: 'clients', icon: Users, label: 'Clients', module: 'clients', group: 'Parties' },
@@ -522,6 +500,8 @@ function App() {
     { id: 'receipts', icon: Receipt, label: 'Receipts', module: 'receipts', group: 'Money' },
     { id: 'payrecon', icon: Receipt, label: 'Payment Recon', module: 'reports', group: 'Money' },
     { id: 'cashbook', icon: Banknote, label: 'Cash Book', module: 'reports', group: 'Money' },
+    { id: 'bankfeed', icon: Banknote, label: 'Bank Feed', module: 'reports', group: 'Money' },
+    { id: 'vouchers', icon: BookOpen, label: 'Vouchers', module: 'reports', group: 'Books' },
     { id: 'expenses', icon: Wallet, label: 'Expenses', module: 'expenses', group: 'Money' },
     { id: 'purchases', icon: ShoppingCart, label: 'Purchases', module: 'purchases', group: 'Purchases' },
     { id: 'coa', icon: BookOpen, label: 'Chart of Accounts', module: 'reports', group: 'Books' },
@@ -533,7 +513,6 @@ function App() {
     { id: 'incometax', icon: Calculator, label: 'Income Tax', module: 'incomeTax', group: 'Compliance' },
     { id: 'inventory', icon: Package, label: 'Services', module: 'inventory', group: 'System' },
     { id: 'guide', icon: HelpCircle, label: 'User Guide', module: 'dashboard', group: 'System' },
->>>>>>> 3f3c45d7c8ea71d2a90deab77cf2730ac0ab4eae
   ].filter(item => showIfModule(item.module));
 
   // Command palette actions — declared here (not earlier) because the deps
@@ -846,20 +825,10 @@ function App() {
         </div>
 
         <nav className="sidebar-nav">
-<<<<<<< HEAD
-          {navItems.map(item => (
-            <button
-              key={item.id}
-              className={`nav-btn ${currentView === item.id ? 'nav-btn-active' : ''}`}
-              onClick={item.onClick || (() => setCurrentView(item.id))}
-            >
-              <item.icon size={18} /> <span className="nav-label">{item.label}</span>
-            </button>
-          ))}
-=======
           {navItems.map((item, idx) => {
             const prevGroup = idx > 0 ? navItems[idx - 1].group : null;
             const showGroup = item.group && item.group !== prevGroup;
+            const isNested = !!item.parent;
             return (
               <div key={item.id}>
                 {showGroup && (
@@ -870,15 +839,16 @@ function App() {
                   }}>{item.group}</div>
                 )}
                 <button
-                  className={`nav-btn ${currentView === item.id ? 'nav-btn-active' : ''}`}
+                  className={`nav-btn ${currentView === item.id ? 'nav-btn-active' : ''}${isNested ? ' nav-btn-nested' : ''}`}
+                  style={isNested ? { paddingLeft: sidebarCollapsed && !sidebarHovered ? undefined : '1.75rem', fontSize: '0.88rem', opacity: 0.95 } : undefined}
                   onClick={item.onClick || (() => setCurrentView(item.id))}
+                  title={item.label}
                 >
-                  <item.icon size={18} /> <span className="nav-label">{item.label}</span>
+                  <item.icon size={isNested ? 16 : 18} /> <span className="nav-label">{item.label}</span>
                 </button>
               </div>
             );
           })}
->>>>>>> 3f3c45d7c8ea71d2a90deab77cf2730ac0ab4eae
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             {/* Update-available banner — only shows when GitHub has a newer version
                 AND the user hasn't already dismissed THIS specific version. New
@@ -969,7 +939,7 @@ function App() {
         <div className="pwa-install-banner">
           <Download size={18} />
           <span>
-            <strong>Install as Desktop App</strong> — own icon, no browser, opens instantly. Right-click the icon for quick-jump to New Invoice / GST Returns.
+            <strong>Install as Desktop App</strong> — own icon, no browser chrome. Requires Chrome/Edge on this same URL after <code>npm run build</code> + server (localhost or HTTPS). If Install stays grey, open DevTools → Application → Manifest.
           </span>
           <button className="pwa-install-btn" onClick={handleInstallPWA}>Install App</button>
           <button className="pwa-dismiss-btn" onClick={dismissInstallBanner} title="Remind me later (re-shows in 14 days)"><X size={16} /></button>
@@ -1031,6 +1001,12 @@ function App() {
         )}
         {currentView === 'payrecon' && (
           <PaymentReconView key={businessKey} />
+        )}
+        {currentView === 'bankfeed' && (
+          <Suspense fallback={<ViewLoading />}><BankFeedView key={businessKey} /></Suspense>
+        )}
+        {currentView === 'vouchers' && (
+          <Suspense fallback={<ViewLoading />}><VoucherEntryView key={businessKey} /></Suspense>
         )}
         {currentView === 'recurring' && (
           <RecurringInvoices key={businessKey} onEdit={handleEditInvoice} />

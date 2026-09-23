@@ -914,18 +914,22 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
   return (
     <div
       className={`invoice-preview-container ${paperCfg.cssClass} template-${pdfStyleVariant}`}
-      style={pdfStyleVariant === 'saidurga' ? {
-        fontFamily: "'Times New Roman', Times, serif",
-        border: '2px solid #111',
-        padding: '12px',
-      } : undefined}
       data-user-colors={_ps_final.userColorsEnabled ? '1' : '0'}
       data-row-density={_ps_final.rowDensity || 'normal'}
       data-header-compact={_ps_final.headerCompact ? '1' : '0'}
-      ref={ref} {...(previewOnly ? {} : { id: 'invoice-preview' })} style={finalContainerStyle}>
+      ref={ref}
+      {...(previewOnly ? {} : { id: 'invoice-preview' })}
+      style={{
+        ...finalContainerStyle,
+        ...((pdfStyleVariant === 'saidurga' || pdfStyleVariant === 'tally') ? {
+          fontFamily: "'Times New Roman', Times, serif",
+          border: '2px solid #111',
+          padding: '12px',
+        } : {}),
+      }}>
 
       {/* ===== SAI DURGA PIXEL LAYOUT (Print Settings → Sai Durga preset) ===== */}
-      {pdfStyleVariant === 'saidurga' && !isThermal && (
+      {(pdfStyleVariant === 'saidurga' || pdfStyleVariant === 'tally') && !isThermal && (
         <div className="sd-invoice" style={{ fontFamily: 'Helvetica, Arial, sans-serif', fontSize: '11px', color: '#111', border: '2px solid #111' }}>
           <div style={{ textAlign: 'center', borderBottom: '2px solid #111', padding: '10px 8px' }}>
             <div style={{ fontSize: '20px', fontWeight: 800, letterSpacing: 1 }}>{profile?.businessName || 'SAI DURGA'}</div>
