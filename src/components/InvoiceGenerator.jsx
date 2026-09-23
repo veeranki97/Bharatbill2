@@ -295,8 +295,9 @@ const LineItem = memo(function LineItem({
     onAddRow?.();
   };
   return (
-    <div className="line-item-row" data-item-id={item.id} onKeyDown={handleRowKeyDown}>
-      <div className="line-item-field" style={{ flex: 2.5, position: 'relative' }}>
+    <div className="line-item-row sd-line-grid" data-item-id={item.id} onKeyDown={handleRowKeyDown}
+      style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 0.7fr 0.8fr 0.9fr 0.9fr 0.7fr auto', gap: 6, alignItems: 'end', width: '100%' }}>
+      <div className="line-item-field" style={{ position: 'relative', minWidth: 0 }}>
         <label className="form-label">Description</label>
         {/* v1.10.37 — Keyboard nav on product suggestions. Reported:
             "20 invoices/day is slow because product picker forces the
@@ -313,8 +314,18 @@ const LineItem = memo(function LineItem({
           currency={currency}
         />
       </div>
-      {invoiceOptions.showHSN && (
-        <div className="line-item-field" style={{ flex: 1, position: 'relative' }}>
+      <div className="line-item-field" title="Cost center (not printed on PDF)" style={{ minWidth: 0 }}>
+          <label className="form-label">CostHead</label>
+          <select className="form-input" value={item.costCenterId || ''}
+            onChange={(e) => onFieldChange(item.id, 'costCenterId', e.target.value)}>
+            <option value="">— None —</option>
+            {(costCenters || []).map(cc => (
+              <option key={cc.id || cc.name} value={cc.id || cc.name}>{cc.name || cc.id}</option>
+            ))}
+          </select>
+        </div>
+      {(
+        <div className="line-item-field" style={{ position: 'relative', minWidth: 0 }}>
           <label className="form-label">SAC</label>
           <input type="text" className="form-input" value={item.hsn} list="sac-codes" placeholder="SAC/HSN"
             onChange={(e) => {
@@ -377,16 +388,7 @@ const LineItem = memo(function LineItem({
           ))}
         </select>
       </div>
-        <div className="form-group" title="Cost center (not printed on PDF)">
-          <label className="form-label" style={{ fontSize: '0.7rem' }}>Cost Center</label>
-          <select className="form-input" value={item.costCenterId || ''}
-            onChange={(e) => onFieldChange(item.id, 'costCenterId', e.target.value)}>
-            <option value="">— None —</option>
-            {(costCenters || []).map(cc => (
-              <option key={cc.id || cc.name} value={cc.id || cc.name}>{cc.name || cc.id}</option>
-            ))}
-          </select>
-        </div>
+        
       <div className="line-item-field" style={{ flex: 1.2 }}>
         <label className="form-label">Rate</label>
         <input type="number" min="0" step="any" className="form-input" value={item.rate}
@@ -568,7 +570,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     dueDate: '',
     placeOfSupply: '',
     originalInvoiceRef: '',
-    periodStart: '',
+    periodStart: '', revisionNo: '', vehicleNo: '',
     periodEnd: '',
     workDetails: '',
     site: '',
@@ -988,7 +990,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       }
     });
     getAllClients().then(clients => {
-      setSavedClients(clients);
+      setSavedClients((clients||[]).filter(c => !c.isVendor && c.type !== 'vendor'));
       // Auto-link if editing a bill with a known client
       if (client.name.trim()) {
         const match = clients.find(c => c.name.toLowerCase() === client.name.trim().toLowerCase());
@@ -1438,7 +1440,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     const data = { ...formData };
     if (isEditingClient && modalClient?.id) data.id = modalClient.id;
     await saveClient(data);
-    const updated = await getAllClients();
+    const updated = (await getAllClients() || []).filter(c => !c.isVendor && c.type !== 'vendor');
     setSavedClients(updated);
     // Sync the invoice form with the FULL saved record — dropping
     // country/email/phone/isSEZ here was the SEZ tax bug.
@@ -1469,11 +1471,36 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   // suggestion list identity stable across renders where neither
   // input matters (saves a downstream re-render of the suggestion
   // dropdown).
+  // Clients only (never vendors); optional state filter for SD cascade
+  const [filterState, setFilterState] = useState('');
+  const clientOnlyList = useMemo(
+    () => (savedClients || []).filter(c => !c.isVendor && c.type !== 'vendor'),
+    [savedClients],
+  );
   const filteredClients = useMemo(() => {
-    const q = client.name.trim().toLowerCase();
-    if (!q) return savedClients;
-    return savedClients.filter(cli => cli.name.toLowerCase().includes(q));
-  }, [client.name, savedClients]);
+    let list = clientOnlyList;
+    if (filterState) {
+      list = list.filter(cli => (cli.state || '').toLowerCase() === filterState.toLowerCase());
+    }
+    const q = (client.name || '').trim().toLowerCase();
+    if (q) list = list.filter(cli => (cli.name || '').toLowerCase().includes(q));
+    return list;
+  }, [client.name, clientOnlyList, filterState]);
+  const clientSites = useMemo(() => {
+    const master = clientOnlyList.find(c =>
+      (c.name || '').trim().toLowerCase() === (client.name || '').trim().toLowerCase()
+    );
+    const sites = master?.sites || (master?.site ? [master.site] : []) || (client.sites || []);
+    const arr = Array.isArray(sites) ? sites.filter(Boolean) : [];
+    if (client.site && !arr.includes(client.site)) arr.unshift(client.site);
+    return arr.length ? arr : ['Main Site'];
+  }, [clientOnlyList, client.name, client.site, client.sites]);
+  const stateOptionsForFilter = useMemo(() => {
+    const s = new Set();
+    clientOnlyList.forEach(c => { if (c.state) s.add(c.state); });
+    getStatesForCountry(profile?.country || 'India').forEach(x => s.add(x));
+    return [...s].filter(Boolean).sort();
+  }, [clientOnlyList, profile?.country]);
 
   // Close suggestions on click outside
   useEffect(() => {
@@ -3694,6 +3721,50 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
             <div className="flex justify-between items-center mb-4">
               <h3 className="section-title" style={{ margin: 0 }}>Client · Site · Billing</h3>
             </div>
+            {/* SD cascade: State → Client → Site */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 8, marginBottom: 10 }}>
+              <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                <label className="form-label">Filter State</label>
+                <select className="form-input" value={filterState}
+                  onChange={e => { setFilterState(e.target.value); }}>
+                  <option value="">All states</option>
+                  {stateOptionsForFilter.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ gridColumn: 'span 5' }}>
+                <label className="form-label">Company / Client *</label>
+                <select className="form-input"
+                  value={(clientOnlyList.find(c => (c.name||'').toLowerCase() === (client.name||'').toLowerCase()) || {}).id || ''}
+                  onChange={e => {
+                    const c = clientOnlyList.find(x => x.id === e.target.value);
+                    if (!c) return;
+                    setSelectedClientId(c.id);
+                    setClient({
+                      name: c.name || '', address: c.address || '', city: c.city || '', pin: c.pin || '',
+                      state: c.state || '', gstin: c.gstin || '', country: c.country || client.country || '',
+                      email: c.email || '', phone: c.phone || '', isSEZ: !!c.isSEZ,
+                      site: c.site || (c.sites && c.sites[0]) || 'Main Site', sites: c.sites || [],
+                    });
+                    if (c.state) setFilterState(c.state);
+                  }}>
+                  <option value="">Select client…</option>
+                  {filteredClients.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}{c.gstin ? ` (${c.gstin})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group" style={{ gridColumn: 'span 4' }}>
+                <label className="form-label">Site *</label>
+                <select className="form-input" value={client.site || details.site || ''}
+                  onChange={e => {
+                    const site = e.target.value;
+                    setClient(prev => ({ ...prev, site }));
+                    setDetails(prev => ({ ...prev, site }));
+                  }}>
+                  {clientSites.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
 
             {/* v1.10.24 — Client credit banner. Shows when the picked
                 client has overpayment sitting unused on prior bills;
@@ -4128,15 +4199,16 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
               )}
             </div>
             
-            <div className="line-items-header" style={{ display: 'flex', gap: '0.4rem', fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', padding: '0.25rem 0', borderBottom: '2px solid #e2e8f0' }}>
-              <span style={{ flex: 2.5 }}>Description</span>
-              <span style={{ flex: 1 }}>CostHead *</span>
-              <span style={{ flex: 1 }}>SAC</span>
-              <span style={{ flex: 0.8 }}>Unit</span>
-              <span style={{ flex: 0.7 }}>Qty</span>
-              <span style={{ flex: 0.9 }}>Rate</span>
-              <span style={{ flex: 0.9 }}>Amount</span>
-              <span style={{ width: 36 }}></span>
+            <div className="line-items-header sd-line-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 0.7fr 0.8fr 0.9fr 0.9fr 0.7fr auto', gap: 6, fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', padding: '0.35rem 0', borderBottom: '2px solid #e2e8f0', width: '100%' }}>
+              <span>Description</span>
+              <span>CostHead</span>
+              <span>SAC</span>
+              <span>Qty</span>
+              <span>Unit</span>
+              <span>Rate</span>
+              <span>Amount</span>
+              <span>GST%</span>
+              <span></span>
             </div>
             {items.map((item, idx) => (
               <LineItem

@@ -929,7 +929,18 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
       }}>
 
       {/* ===== SAI DURGA PIXEL LAYOUT (Print Settings → Sai Durga preset) ===== */}
-      {(pdfStyleVariant === 'saidurga' || pdfStyleVariant === 'tally') && !isThermal && (
+      
+      {(pdfStyleVariant === 'tally' || pdfStyleVariant === 'saidurga') && (
+        <style>{`
+          .inv-table-tally, .inv-table-tally th, .inv-table-tally td {
+            border: 1px solid #000 !important;
+            border-collapse: collapse !important;
+          }
+          .inv-table-tally th { background: #f1f5f9; font-weight: 700; }
+          .template-tally .invoice-preview-container { font-family: Arial, sans-serif; }
+        `}</style>
+      )}
+{(pdfStyleVariant === 'saidurga' || pdfStyleVariant === 'tally') && !isThermal && (
         <div className="sd-invoice" style={{ fontFamily: 'Helvetica, Arial, sans-serif', fontSize: '11px', color: '#111', border: '2px solid #111' }}>
           {/* Tally-style 3-box top band when template is tally */}
           {pdfStyleVariant === 'tally' ? (

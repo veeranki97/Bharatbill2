@@ -3590,3 +3590,12 @@ kbd {
   .sd-inv-toolbar, .sd-inv-party, .sd-inv-addr, .sd-inv-period { grid-template-columns: 1fr 1fr; }
   .sd-inv-body { grid-template-columns: 1fr; }
 }
+
+.inv-table-tally, .inv-table-tally th, .inv-table-tally td {
+  border: 1px solid #111 !important;
+  border-collapse: collapse !important;
+  padding: 4px 6px !important;
+}
+.inv-table-tally th { background: #f1f5f9 !important; }
+.sd-line-grid .form-label { font-size: 0.68rem; margin-bottom: 2px; }
+.sd-inv-form .line-item-row { margin-bottom: 4px; }
