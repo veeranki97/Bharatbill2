@@ -377,6 +377,12 @@ const LineItem = memo(function LineItem({
           ))}
         </select>
       </div>
+        <div className="form-group" title="Cost center (not printed on PDF)">
+          <label className="form-label" style={{ fontSize: '0.7rem' }}>Cost Center</label>
+          <input className="form-input" list="item-cost-centers" placeholder="Optional"
+            value={item.costCenterId || ''}
+            onChange={(e) => onFieldChange(item.id, 'costCenterId', e.target.value)} />
+        </div>
       <div className="line-item-field" style={{ flex: 1.2 }}>
         <label className="form-label">Rate</label>
         <input type="number" min="0" step="any" className="form-input" value={item.rate}
@@ -572,7 +578,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   });
 
   const [items, setItems] = useState(draft?.items || [
-    { id: Date.now().toString(), name: '', hsn: '', quantity: 1, unit: 'Nos', rate: 0, discount: 0, taxPercent: 18, cessPercent: 0 }
+    { id: Date.now().toString(), name: '', hsn: '', quantity: 1, unit: 'Nos', rate: 0, discount: 0, taxPercent: 18, cessPercent: 0, costCenterId: '' }
   ]);
   // v1.10.24 — Client credit balance state. Loaded once on mount + refreshed
   // when the client name changes. `creditToApply` is what the user chose to

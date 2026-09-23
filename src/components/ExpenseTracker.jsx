@@ -48,6 +48,7 @@ const emptyForm = {
   receiptName: '',
   claimStatus: 'Draft',
   costCenterId: '',
+  costSplits: [], // [{ costCenterId, pct }]
   submittedBy: '',
 
   date: new Date().toISOString().split('T')[0],

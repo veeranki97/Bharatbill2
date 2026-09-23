@@ -8,6 +8,7 @@ import { openWhatsAppShare } from '../utils/share';
 import PageHeader from './PageHeader';
 import { toast } from './Toast';
 import ActionMenu from './ActionMenu';
+import { billsToSdCsv, downloadSdExport } from '../utils/sdExport';
 import { confirmAction } from './ConfirmModal';
 
 // v1.10.13 — `bg` values switched from opaque tints (#fffbeb / #f5f3ff /
@@ -1065,9 +1066,9 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
   return (
     <div className="dashboard-container">
       <PageHeader
-        icon="📊"
-        title="Dashboard"
-        subtitle="Overview of your invoices"
+        icon={listMode ? "📄" : "📊"}
+        title={listMode ? "Invoices" : "Dashboard"}
+        subtitle={listMode ? "All tax invoices, proformas, credit notes & challans" : "Overview of your invoices"}
         meta={`${bills.length} invoice${bills.length === 1 ? '' : 's'}`}>
         <HelpButton title="Dashboard — how to use">
           <ul style={{ paddingLeft: '1.1rem', margin: 0 }}>
@@ -1080,7 +1081,14 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
             <li><strong>Low-stock alert</strong> — appears when any product is at or below your threshold (Settings → Stock alert).</li>
           </ul>
         </HelpButton>
-        {listMode ? <button className="btn btn-primary" onClick={onNew}><Plus size={18} /> New Invoice</button> : null}
+        {listMode ? (
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => {
+              downloadSdExport('SD-Invoices-Export.csv', billsToSdCsv(bills));
+            }}>SD Export CSV</button>
+            <button className="btn btn-primary" onClick={onNew}><Plus size={18} /> New Invoice</button>
+          </>
+        ) : null}
       </PageHeader>
 
       {overdueBills.length > 0 && (
@@ -1260,8 +1268,8 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
           <p style={{ marginTop: 12, fontSize: "0.8rem", color: "#64748b" }}>Open the <strong>Invoices</strong> tab for the full list.</p>
         </div>
       )}
-{!listMode ? null : (
-<div className="glass-panel">
+{listMode && (
+<div className="glass-panel invoice-list-panel" data-testid="invoice-list">
         <div className="table-header"><h3>Invoices</h3></div>
         <div className="filters-bar">
           <div className="search-box">

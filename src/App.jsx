@@ -45,6 +45,8 @@ const PaymentReconView = lazy(() => import('./components/PaymentReconView'));
 const FinancialBooksView = lazy(() => import('./components/FinancialBooksView'));
 const BankFeedView = lazy(() => import('./components/BankFeedView'));
 const VoucherEntryView = lazy(() => import('./components/VoucherEntryView'));
+const ServiceRevenueReport = lazy(() => import('./components/ServiceRevenueReport'));
+const WorkflowRulesView = lazy(() => import('./components/WorkflowRulesView'));
 import { getPrintSettings } from './utils/printSettings';
 
 // v1.10.4 — Lightweight Suspense fallback shown while a lazy view
@@ -84,7 +86,10 @@ function App() {
         return v;
       }
     } catch { /* sandboxed history API — fall through */ }
-    return sessionStorage.getItem('gst_currentView') || 'dashboard';
+    const saved = sessionStorage.getItem('gst_currentView') || 'dashboard';
+    // Guard: unknown / partially-updated views must not blank the whole app
+    const known = new Set(['dashboard','invoices','new','recurring','clients','vendors','inventory','expenses','purchases','workorders','purchaseorders','cashbook','costcenters','coa','generalledger','servicerev','finbooks','payrecon','bankfeed','vouchers','workflows','receipts','reports','filing','incometax','guide','settings','controlpanel']);
+    return known.has(saved) ? saved : 'dashboard';
   });
   const [profile, setProfile] = useState(null);
   const [editingBill, setEditingBill] = useState(() => {
@@ -1065,6 +1070,9 @@ function App() {
         )}
         {currentView === 'guide' && (
           <UserGuideView />
+        )}
+        {currentView === 'workflows' && (
+          <Suspense fallback={<ViewLoading />}><WorkflowRulesView key={businessKey} /></Suspense>
         )}
         {currentView === 'settings' && (
           <SettingsView onSaved={(p) => setProfile(p)} />

@@ -41,7 +41,7 @@ if not exist "dist\index.html" (
 )
 
 :: Step 3: Port discovery - read whatever's saved, probe it
-set "PORT=47371"
+set "PORT=47375"
 if exist "data\port.txt" set /p PORT=<data\port.txt
 curl -s -o nul -w "" http://localhost:%PORT%/api/meta/test >nul 2>nul
 if !errorlevel! equ 0 (

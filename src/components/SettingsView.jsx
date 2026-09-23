@@ -1,3 +1,4 @@
+import ChartSettingsPanel from './ChartSettingsPanel';
 import { useState, useEffect, useRef } from 'react';
 import { getProfile, saveProfile, exportAllData, importData, inspectBackup, getTermsTemplates, saveTermsTemplate, deleteTermsTemplate, getAllProfiles, saveBusinessProfile, deleteBusinessProfile, getInvoiceNumberSettings, saveInvoiceNumberSettings, getRegionMode, setRegionMode, getEnabledModules, setEnabledModules, getStockAlertSettings, saveStockAlertSettings, getInvoiceDisplayOptions, saveInvoiceDisplayOptions } from '../store';
 import { ensureToken, findOrCreateFolder, uploadJSON } from '../services/googleDrive';
@@ -2063,6 +2064,7 @@ function BackupAndTrashPanel() {
           </div>
         </div>
       </div>
-    </div>
+          <ChartSettingsPanel />
+</div>
   );
 }

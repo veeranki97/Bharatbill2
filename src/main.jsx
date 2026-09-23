@@ -2,6 +2,19 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App.jsx'
+
+function AppErrorBoundary({ children }) {
+  // Minimal class-free boundary via state in a small wrapper is hard without class —
+  // use window error for blank-page recovery tip
+  return children
+}
+
+window.addEventListener('error', (ev) => {
+  console.error('[App crash]', ev.error || ev.message)
+})
+window.addEventListener('unhandledrejection', (ev) => {
+  console.error('[App rejection]', ev.reason)
+})
 import './index.css'
 import './styles/sidebar-autohide.css'
 
