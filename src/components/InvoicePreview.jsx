@@ -931,6 +931,40 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
       {/* ===== SAI DURGA PIXEL LAYOUT (Print Settings → Sai Durga preset) ===== */}
       {(pdfStyleVariant === 'saidurga' || pdfStyleVariant === 'tally') && !isThermal && (
         <div className="sd-invoice" style={{ fontFamily: 'Helvetica, Arial, sans-serif', fontSize: '11px', color: '#111', border: '2px solid #111' }}>
+          {/* Tally-style 3-box top band when template is tally */}
+          {pdfStyleVariant === 'tally' ? (
+            <table className="tally-hdr-3" style={{ width: '100%', borderCollapse: 'collapse', borderBottom: '2px solid #111' }}>
+              <tbody>
+                <tr>
+                  <td style={{ width: '34%', borderRight: '1px solid #111', padding: 8, verticalAlign: 'top', fontSize: '10px' }}>
+                    <strong style={{ fontSize: '12px' }}>{profile?.businessName}</strong><br />
+                    {[profile?.address, profile?.city, profile?.state, profile?.pin].filter(Boolean).join(', ')}<br />
+                    {profile?.gstin && <>GSTIN: {profile.gstin}</>}
+                  </td>
+                  <td style={{ width: '32%', borderRight: '1px solid #111', textAlign: 'center', verticalAlign: 'middle', padding: 8 }}>
+                    <div style={{
+                      display: 'inline-block', border: '2px solid #111', padding: '6px 14px',
+                      fontWeight: 800, fontSize: '14px', letterSpacing: '0.08em',
+                      color: (String(invoiceType).toLowerCase().includes('credit') ? '#b91c1c' : '#111'),
+                    }}>
+                      {String(invoiceType).toLowerCase().includes('credit') ? 'CREDIT NOTE'
+                        : String(invoiceType).toLowerCase().includes('challan') ? 'DELIVERY CHALLAN'
+                        : String(invoiceType).toLowerCase().includes('proforma') ? 'PROFORMA'
+                        : 'TAX INVOICE'}
+                    </div>
+                  </td>
+                  <td style={{ width: '34%', padding: 8, verticalAlign: 'top', fontSize: '10px' }}>
+                    <div><strong>Invoice No:</strong> {details?.invoiceNumber}</div>
+                    <div><strong>Date:</strong> {details?.invoiceDate}</div>
+                    <div><strong>Place of Supply:</strong> {details?.placeOfSupply || client?.state || '—'}</div>
+                    {(details?.periodStart || details?.periodEnd) && (
+                      <div><strong>Bill Period:</strong> {details.periodStart} to {details.periodEnd}</div>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          ) : (
           <div style={{ textAlign: 'center', borderBottom: '2px solid #111', padding: '10px 8px' }}>
             <div style={{ fontSize: '20px', fontWeight: 800, letterSpacing: 1 }}>{profile?.businessName || 'SAI DURGA'}</div>
             <div style={{
@@ -951,6 +985,7 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
                 : 'TAX INVOICE'}
             </div>
           </div>
+                    )}
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5px' }}>
             <tbody>
               <tr>

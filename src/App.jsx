@@ -409,6 +409,20 @@ function App() {
     } catch { return true; }
   });
   const [sidebarHovered, setSidebarHovered] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    try {
+      const raw = localStorage.getItem('fgsb_nav_groups');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return { Sales: true, Orders: true, Parties: true, Money: true, Purchases: true, Books: true, Compliance: true, System: true, Home: true };
+  });
+  const toggleNavGroup = (g) => {
+    setExpandedGroups(prev => {
+      const next = { ...prev, [g]: !prev[g] };
+      try { localStorage.setItem('fgsb_nav_groups', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
   const sidebarExpanded = !sidebarCollapsed || sidebarHovered || navOpen;
   const toggleSidebarPin = () => {
     setSidebarCollapsed(prev => {
@@ -825,30 +839,53 @@ function App() {
         </div>
 
         <nav className="sidebar-nav">
-          {navItems.map((item, idx) => {
-            const prevGroup = idx > 0 ? navItems[idx - 1].group : null;
-            const showGroup = item.group && item.group !== prevGroup;
-            const isNested = !!item.parent;
-            return (
-              <div key={item.id}>
-                {showGroup && (
-                  <div className="nav-label" style={{
-                    fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em',
-                    textTransform: 'uppercase', color: 'var(--text-muted, #94a3b8)',
-                    padding: '0.65rem 0.85rem 0.25rem', opacity: sidebarCollapsed && !sidebarHovered ? 0 : 1,
-                  }}>{item.group}</div>
-                )}
-                <button
-                  className={`nav-btn ${currentView === item.id ? 'nav-btn-active' : ''}${isNested ? ' nav-btn-nested' : ''}`}
-                  style={isNested ? { paddingLeft: sidebarCollapsed && !sidebarHovered ? undefined : '1.75rem', fontSize: '0.88rem', opacity: 0.95 } : undefined}
-                  onClick={item.onClick || (() => setCurrentView(item.id))}
-                  title={item.label}
-                >
-                  <item.icon size={isNested ? 16 : 18} /> <span className="nav-label">{item.label}</span>
-                </button>
-              </div>
-            );
-          })}
+          {(() => {
+            // Grouped nav: collapsible sections; nested (New Invoice / Recurring) under parent
+            const groups = [];
+            let cur = null;
+            navItems.forEach((item) => {
+              const g = item.group || 'Home';
+              if (!cur || cur.name !== g) {
+                cur = { name: g, items: [] };
+                groups.push(cur);
+              }
+              cur.items.push(item);
+            });
+            return groups.map((grp) => {
+              const open = expandedGroups[grp.name] !== false;
+              return (
+                <div key={grp.name} className="nav-group">
+                  {grp.name !== 'Home' && (
+                    <button
+                      type="button"
+                      className={`nav-group-header${open ? ' open' : ''}`}
+                      onClick={() => toggleNavGroup(grp.name)}
+                      title={open ? `Collapse ${grp.name}` : `Expand ${grp.name}`}
+                    >
+                      <span>{grp.name}</span>
+                      <span className="nav-group-chevron">▸</span>
+                    </button>
+                  )}
+                  {(open || grp.name === 'Home') && grp.items.map((item) => {
+                    const isNested = !!item.parent;
+                    // When Invoices is the parent, show New/Recurring nested only
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`nav-btn ${currentView === item.id ? 'nav-btn-active' : ''}${isNested ? ' nav-btn-nested' : ''}`}
+                        onClick={item.onClick || (() => setCurrentView(item.id))}
+                        title={item.label}
+                      >
+                        <item.icon size={isNested ? 16 : 18} />
+                        <span className="nav-label">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            });
+          })()}
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             {/* Update-available banner — only shows when GitHub has a newer version
                 AND the user hasn't already dismissed THIS specific version. New
