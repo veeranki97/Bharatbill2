@@ -203,7 +203,7 @@ export default function WorkOrdersView() {
         }}>
           <div className="modal" style={{
             background: 'var(--bg-card, #fff)', borderRadius: 12, padding: '1.5rem',
-            width: 'min(720px, 96vw)', maxHeight: '92vh', overflowY: 'auto',
+            width: 'min(960px, 98vw)', maxHeight: '95vh', overflowY: 'auto',
             boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
           }}>
             <h3 style={{ marginTop: 0 }}>

@@ -41,7 +41,7 @@ export const GUIDE_CONTENT = [
   { type: 'h2', text: '2. Quick Start (Windows)' },
   { type: 'p', text: 'You do not need any programming knowledge.' },
   { type: 'ol', items: [
-    'Download the project as a ZIP from github.com/IamRamgarhia/Free-GST-Billing-Software (green Code button → Download ZIP) and unzip it somewhere you will remember (e.g. Documents\\FreeGSTBill).',
+    'Download the project as a ZIP from github.com/veeranki97/Bharatbill2 (green Code button → Download ZIP) and unzip it somewhere you will remember (e.g. Documents\\FreeGSTBill).',
     'Double-click "Install FreeGSTBill.bat". The installer takes 1-2 minutes the first time and asks no questions.',
     'A "Free GST Billing Software" icon appears on your Desktop and in the Start Menu. Use it any time.',
     'The app opens in your browser at http://localhost:47371. Click "Install App" in the address bar to make it look like a normal Windows program.',
@@ -215,7 +215,7 @@ export const GUIDE_CONTENT = [
     ['I made a mistake on an invoice. Can I edit it?', 'Yes. Open it from the Bills list and edit. Or, if you\'ve already sent the PDF, create a Credit Note against the original invoice number — the proper GST way.'],
     ['Why does it open in my browser instead of being a real app?', 'It is a Progressive Web App. Click Install App in the address bar and Windows treats it like any other desktop app — appears in Start Menu, has its own window, no browser chrome.'],
     ['How do I update to a new version?', 'Run Update FreeGSTBill.bat. It pulls the latest from GitHub without touching your data/ folder.'],
-    ['I want a feature that\'s missing.', 'Open an issue at github.com/IamRamgarhia/Free-GST-Billing-Software/issues — many features in this app started as community requests.'],
+    ['I want a feature that\'s missing.', 'Open an issue at github.com/veeranki97/Bharatbill2/issues — many features in this app started as community requests.'],
   ]},
   { type: 'spacer' },
 
@@ -238,7 +238,7 @@ export const GUIDE_CONTENT = [
 
   { type: 'h2', text: '18. Need help?' },
   { type: 'ul', items: [
-    'GitHub issues: github.com/IamRamgarhia/Free-GST-Billing-Software/issues',
+    'GitHub issues: github.com/veeranki97/Bharatbill2/issues',
     'Email DiceCodes: contact@dicecodes.com',
   ]},
 ];

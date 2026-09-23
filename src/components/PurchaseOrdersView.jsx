@@ -6,6 +6,7 @@ import {
   deletePurchaseOrder,
   getAllClients,
   getProfile,
+  getAllCostCenters,
 } from '../store';
 import { emptyWOItem, calcItemAmount } from '../utils/workOrder';
 import { formatCurrency } from '../utils';
@@ -135,6 +136,7 @@ function printPO(po, profile, fingerprint) {
 
 export default function PurchaseOrdersView() {
   const [list, setList] = useState([]);
+  const [costCenters, setCostCenters] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState(null);
@@ -158,6 +160,9 @@ export default function PurchaseOrdersView() {
     }
   };
 
+  useEffect(() => {
+    getAllCostCenters().then(setCostCenters).catch(() => {});
+  }, []);
   useEffect(() => { load(); }, []);
 
   const openNew = () =>
@@ -193,6 +198,7 @@ export default function PurchaseOrdersView() {
 
   const save = async () => {
     if (!form.vendorName?.trim()) return toast('Vendor required', 'error');
+    if (!(form.costCenterId || '').trim()) return toast('Cost Center is required', 'error');
     if (!form.poNumber?.trim()) form.poNumber = nextPONumber(list);
     const items = (form.items || []).map(it => ({ ...it, amount: calcItemAmount(it) }));
     const totals = calcPOTotals(items, form.taxRate, form.vendorState, profile?.state);
@@ -273,6 +279,16 @@ export default function PurchaseOrdersView() {
           </div>
           <div className="form-group">
             <label className="form-label">Ship To (Site)</label>
+            <div className="form-group">
+              <label className="form-label">Cost Center *</label>
+              <select className="form-input" value={form.costCenterId || ''}
+                onChange={e => setForm({ ...form, costCenterId: e.target.value })}>
+                <option value="">Select cost center…</option>
+                {(costCenters || []).map(cc => (
+                  <option key={cc.id || cc.name} value={cc.id || cc.name}>{cc.name || cc.id}</option>
+                ))}
+              </select>
+            </div>
             <input className="form-input" value={form.site || ''}
               onChange={e => setForm({ ...form, site: e.target.value })} />
           </div>

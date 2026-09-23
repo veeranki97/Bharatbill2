@@ -198,7 +198,7 @@ export default function ReportsView() {
         const bySite = {};
         allFilteredBills.forEach(b => {
           if (b.status === 'cancelled') return;
-          const site = b.site || b.data?.site || b.data?.details?.site || 'Unassigned';
+          const site = b.site || b.data?.site || b.data?.details?.site || b.data?.client?.site || b.costCenterId || b.data?.costCenterId || 'Unassigned';
           if (!bySite[site]) bySite[site] = { site, revenue: 0, tax: 0, count: 0 };
           const tot = Number(b.totalAmount) || 0;
           const tax = Number(b.data?.totals?.totalTax || b.data?.totals?.tax) || 0;
@@ -255,7 +255,7 @@ export default function ReportsView() {
         const byWO = {};
         allFilteredBills.forEach(b => {
           if (b.status === 'cancelled') return;
-          const wo = b.data?.details?.workOrderNo || b.workOrderNo || b.data?.workOrderId || 'No WO';
+          const wo = b.data?.details?.workOrderNo || b.workOrderNo || b.data?.workOrderId || b.workOrderId || b.data?.details?.workOrderId || 'No WO';
           if (!byWO[wo]) byWO[wo] = { wo, revenue: 0, tax: 0, count: 0 };
           const tot = Number(b.totalAmount) || 0;
           const tax = Number(b.data?.totals?.totalTax || b.data?.totals?.tax) || 0;

@@ -8,6 +8,20 @@ import { toast } from './Toast';
  * Chronological cash book with opening balance + running balance.
  * Opening balance stored in localStorage key freegstbill_cashbook_ob
  */
+function exportCashCsv(rows) {
+  const cols = ['date', 'type', 'name', 'ref', 'inflow', 'outflow', 'balance'];
+  const lines = [cols.join(',')].concat((rows || []).map(r =>
+    cols.map(c => {
+      const s = r[c] == null ? '' : String(r[c]);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(',')
+  ));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
+  a.download = 'cash-book.csv';
+  a.click();
+}
+
 export default function CashBookView() {
   const [receipts, setReceipts] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -86,6 +100,7 @@ export default function CashBookView() {
         <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Banknote size={22} /> Cash Book
         </h2>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportCashCsv(rows)}>Export CSV</button>
         <p className="page-subtitle">Running balance from receipts & expenses</p>
       </div>
 

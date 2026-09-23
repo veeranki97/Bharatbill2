@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { ShoppingCart, Plus, Edit3, Trash2, Search, X, Save, Download, Wand2, FileText, Eye } from 'lucide-react';
 import HelpButton from './HelpButton';
 import { getAllPurchases, savePurchase, deletePurchase, getAllProducts, saveProduct, getProfile } from '../store';
+import { getAllWorkOrders as fetchWOs, getAllCostCenters as fetchCCs } from '../store';
 import { formatCurrency, calculateRoundOff, getFYOptions, belongsToProfile, isUnassignedToBusiness, toCsvLine } from '../utils';
 import UnassignedBanner from './UnassignedBanner';
 import { getPrintSettings } from '../utils/printSettings';
@@ -87,6 +88,8 @@ export default function PurchaseBills() {
   const [fyFilter, setFyFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [purchaseWOs, setPurchaseWOs] = useState([]);
+  const [purchaseCCs, setPurchaseCCs] = useState([]);
   const [form, setForm] = useState({ ...emptyForm, items: [{ ...emptyItem }] });
   // v1.10.22 — OCR modal state.
   const [showOCR, setShowOCR] = useState(false);
@@ -184,6 +187,12 @@ export default function PurchaseBills() {
     }
   };
 
+  useEffect(() => {
+    try {
+      fetchWOs().then(setPurchaseWOs).catch(() => {});
+      fetchCCs().then(setPurchaseCCs).catch(() => {});
+    } catch {}
+  }, []);
   useEffect(() => {
     if (fyOptions[0]) setFyFilter(fyOptions[0].value);
     loadPurchases();

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Receipt, Plus, Trash2, Search, Printer, Pencil, Layers } from 'lucide-react';
-import { getAllReceipts, saveReceipt, deleteReceipt, getAllBills, getProfile, getNextInvoiceNumber, saveBill, saveJournal } from '../store';
+import { getAllReceipts, saveReceipt, deleteReceipt, getAllBills, getProfile, getNextInvoiceNumber, saveBill, saveJournal, getAllWorkOrders, getAllCostCenters } from '../store';
 import { journalFromPayment } from '../utils/ledger';
 import { formatCurrency, numberToWords, belongsToProfile, isUnassignedToBusiness } from '../utils';
 import { planBulkAllocation } from '../utils/bulkPayment';
@@ -22,6 +22,10 @@ const emptyForm = {
   note: '',
   paymentType: 'invoice', // advance | invoice | vendor
   direction: 'in', // in | out
+  site: '',
+  workOrderId: '',
+  workOrderNo: '',
+  costCenterId: '',
 };
 
 export default function ReceiptVoucher() {
@@ -30,6 +34,8 @@ export default function ReceiptVoucher() {
   const [profile, setProfile] = useState({});
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [workOrders, setWorkOrders] = useState([]);
+  const [costCenters, setCostCenters] = useState([]);
   const [form, setForm] = useState({ ...emptyForm });
   const [previewReceipt, setPreviewReceipt] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -59,6 +65,10 @@ export default function ReceiptVoucher() {
     }
   };
 
+  useEffect(() => {
+    getAllWorkOrders().then(setWorkOrders).catch(() => {});
+    getAllCostCenters().then(setCostCenters).catch(() => {});
+  }, []);
   useEffect(() => {
     loadData();
   }, []);
@@ -532,6 +542,43 @@ export default function ReceiptVoucher() {
                 <label className="form-label">Against Invoice</label>
                 <input type="text" className="form-input" value={form.againstInvoice} onChange={e => updateField('againstInvoice', e.target.value)} placeholder="e.g. INV/2025-26/0001" />
               </div>
+
+              {(form.paymentType === 'advance' || form.paymentType === 'vendor') && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">Site</label>
+                    <input className="form-input" value={form.site || ''} onChange={e => updateField('site', e.target.value)} placeholder="Site / location" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Work Order</label>
+                    <select className="form-input" value={form.workOrderId || ''}
+                      onChange={e => {
+                        const id = e.target.value;
+                        const wo = workOrders.find(w => w.id === id);
+                        updateField('workOrderId', id);
+                        if (wo?.costCenterId) updateField('costCenterId', wo.costCenterId);
+                        if (wo?.site) updateField('site', wo.site);
+                        if (wo?.woNumber) updateField('workOrderNo', wo.woNumber);
+                      }}>
+                      <option value="">— Select WO —</option>
+                      {workOrders.map(wo => (
+                        <option key={wo.id} value={wo.id}>{wo.woNumber} — {wo.clientName || ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Cost Center</label>
+                    <select className="form-input" value={form.costCenterId || ''}
+                      onChange={e => updateField('costCenterId', e.target.value)}>
+                      <option value="">—</option>
+                      {costCenters.map(cc => (
+                        <option key={cc.id || cc.name} value={cc.id || cc.name}>{cc.name || cc.id}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
                 <label className="form-label">Note (optional)</label>
                 <input type="text" className="form-input" value={form.note} onChange={e => updateField('note', e.target.value)} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Wallet, Plus, Edit3, Trash2, Search, X, Save, Download, Calendar } from 'lucide-react';
-import { getAllExpenses, saveExpense, deleteExpense, getProfile, getAllWorkOrders, getAllBills } from '../store';
+import { getAllExpenses, saveExpense, deleteExpense, getProfile, getAllWorkOrders, getAllBills, getAllCostCenters } from '../store';
 import { formatCurrency, getFYOptions, belongsToProfile, isUnassignedToBusiness, toCsvLine } from '../utils';
 import UnassignedBanner from './UnassignedBanner';
 import { toast } from './Toast';
@@ -38,6 +38,10 @@ const EXPENSE_CATEGORIES = [
   { name: 'Other',                  itrHead: 'business' },
 ];
 const CATEGORY_NAMES = EXPENSE_CATEGORIES.map(c => c.name);
+const EXTRA_CAT_KEY = 'fgsb_expense_categories';
+function loadExtraCats() {
+  try { return JSON.parse(localStorage.getItem(EXTRA_CAT_KEY) || '[]'); } catch { return []; }
+}
 
 const PAYMENT_MODES = ['Bank Transfer', 'UPI', 'Cash', 'Cheque', 'Card', 'Other'];
 
@@ -73,6 +77,12 @@ const emptyForm = {
 
 export default function ExpenseTracker() {
   const [expenses, setExpenses] = useState([]);
+  const [customCats, setCustomCats] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('fgsb_expense_categories') || '[]'); } catch { return []; }
+  });
+  const [newCatName, setNewCatName] = useState('');
+  const [workOrders, setWorkOrders] = useState([]);
+  const [costCenters, setCostCenters] = useState([]);
   // v1.10.65 (#58 item 3) — the business these records belong to.
   const [ownerProfile, setOwnerProfile] = useState(null);
   const [search, setSearch] = useState('');
@@ -102,6 +112,8 @@ export default function ExpenseTracker() {
       ownerName: ownerProfile?.businessName || '',
     })));
     loadExpenses();
+    getAllWorkOrders().then(setWorkOrders).catch(() => {});
+    getAllCostCenters().then(setCostCenters).catch(() => {});
   };
 
   const loadExpenses = async () => {
@@ -316,7 +328,7 @@ export default function ExpenseTracker() {
           </div>
           <select className="filter-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
             <option value="all">All Categories</option>
-            {CATEGORY_NAMES.map(c => <option key={c} value={c}>{c}</option>)}
+            {[...CATEGORY_NAMES, ...customCats].map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <select className="filter-select" value={fyFilter} onChange={e => setFyFilter(e.target.value)}>
             {fyOptions.map(fy => <option key={fy.value} value={fy.value}>{fy.label}</option>)}
@@ -398,7 +410,52 @@ export default function ExpenseTracker() {
                 <input type="text" className="form-input" value={form.invoiceNo}
                   onChange={e => updateField('invoiceNo', e.target.value)} placeholder="Optional" />
               </div>
+              
+              <div className="form-group" style={{ gridColumn: '1 / -1', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                <div style={{ flex: 1 }}>
+                  <label className="form-label">Add Expense Category</label>
+                  <input className="form-input" value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="New category name" />
+                </div>
+                <button type="button" className="btn btn-secondary" onClick={() => {
+                  if (!newCatName.trim()) return;
+                  const next = [...new Set([...customCats, newCatName.trim()])];
+                  setCustomCats(next);
+                  localStorage.setItem('fgsb_expense_categories', JSON.stringify(next));
+                  setForm(f => ({ ...f, category: newCatName.trim() }));
+                  setNewCatName('');
+                  toast('Category added', 'success');
+                }}>Add Category</button>
+              </div>
               <div className="form-group">
+                <label className="form-label">Work Order</label>
+                <select className="form-input" value={form.workOrderId || ''}
+                  onChange={e => {
+                    const id = e.target.value;
+                    const wo = workOrders.find(w => w.id === id);
+                    setForm(f => ({
+                      ...f,
+                      workOrderId: id,
+                      costCenterId: wo?.costCenterId || f.costCenterId || '',
+                      site: wo?.site || f.site || '',
+                    }));
+                  }}>
+                  <option value="">— None —</option>
+                  {workOrders.map(wo => (
+                    <option key={wo.id} value={wo.id}>{wo.woNumber} — {wo.clientName || wo.title || ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Cost Center</label>
+                <select className="form-input" value={form.costCenterId || ''}
+                  onChange={e => setForm(f => ({ ...f, costCenterId: e.target.value }))}>
+                  <option value="">— None —</option>
+                  {costCenters.map(cc => (
+                    <option key={cc.id || cc.name} value={cc.id || cc.name}>{cc.name || cc.id}</option>
+                  ))}
+                </select>
+              </div>
+<div className="form-group">
                 <label className="form-label">Payment Mode</label>
                 <select className="form-input" value={form.paymentMode} onChange={e => updateField('paymentMode', e.target.value)}>
                   {PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
