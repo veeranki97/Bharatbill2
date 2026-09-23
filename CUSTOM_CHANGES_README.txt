@@ -1,20 +1,34 @@
 ========================================================
-  CUSTOM Free-GST FULL v8 — scoped outstanding work
+  SD Dynamics v2.0.0 — custom layer vs upstream
 ========================================================
+Repo: https://github.com/veeranki97/SD Dynamics
+Base: Free GST Billing Software (IamRamgarhia / DiceCodes, MIT)
 
-1. ActionMenu: Vendors, Work Orders (+ already Dashboard invoices)
-2. GSTIN mod-36 check digit in isValidIndianGSTIN
-3. Aging: notYetDue | 0to30 | 31to60 | 61to90 | 90plus
-4. Cost Centers master + API; expense Cost Center required
-5. Chart of Accounts, General Ledger, Payment Recon screens
-6. Expense claimStatus Draft→Paid + cost center required
-7. Client creditLimit, paymentTerms, tdsSection; invoice credit warn
-8. PO Ship To <select> from sites
-9. Site P&L still basic (TDS section on client for future rate map)
-10. Quotation + Debit Note in INVOICE_TYPES (QUO / DN); PI prefix for proforma
-11. Prefixes in INVOICE_TYPES (CN, DC, QUO, DN, PI) — counters per prefix via existing server
+CUSTOM MODULES / FILES (high level)
+  - WorkOrdersView, PurchaseOrdersView, VendorsView
+  - CostCentersView, ChartOfAccountsView, GeneralLedgerView
+  - FinancialBooksView, CashBookView, PaymentReconView
+  - BankFeedView, VoucherEntryView, ServiceRevenueReport
+  - DashboardCharts, ActionMenu, WorkflowRulesView
+  - src/utils/ledger.js (journal helpers)
+  - Sai Durga / Tally PDF variants in InvoicePreview
+  - server.js update check → veeranki97/SD Dynamics
 
-NOT FULL Tally: Period close voucher, Budget Stop/Warn full UI,
-claimant≠approver server RBAC, universal 3-dots on every screen.
+INVOICE / ERP BEHAVIOUR
+  - State → Client → Site cascade (clients only, not vendors)
+  - WO auto-fill, budget ceiling, due date +30 days
+  - Payment → journal + receipt (GL + cash book)
+  - Cost center on PO (required), expenses, receipts, purchase bills
 
-RUN: npm install && npm run build && node server.js
+VERSIONING
+  - First fork release: 2.0.0 (see CHANGELOG.md)
+  - Bump package.json when you tag GitHub Releases
+
+RUN
+  npm install && npm run build && npm start
+  Protect the data/ folder on every update.
+
+NOT CLAIMED AS FULL TALLY/SAP
+  Full multi-currency GL rewrite, hard period lock UX, and
+  server-side RBAC for claim approval are still limited.
+========================================================
