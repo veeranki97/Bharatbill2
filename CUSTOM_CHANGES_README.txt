@@ -1,34 +1,16 @@
 ========================================================
-  SD Dynamics v2.0.0 — custom layer vs upstream
+  SD Dynamics v2.0.0
 ========================================================
-Repo: https://github.com/veeranki97/SD Dynamics
-Base: Free GST Billing Software (IamRamgarhia / DiceCodes, MIT)
+Product name:  SD Dynamics
+GitHub repo:   https://github.com/veeranki97/Bharatbill2
+Base:          Free GST Billing Software (MIT)
 
-CUSTOM MODULES / FILES (high level)
-  - WorkOrdersView, PurchaseOrdersView, VendorsView
-  - CostCentersView, ChartOfAccountsView, GeneralLedgerView
-  - FinancialBooksView, CashBookView, PaymentReconView
-  - BankFeedView, VoucherEntryView, ServiceRevenueReport
-  - DashboardCharts, ActionMenu, WorkflowRulesView
-  - src/utils/ledger.js (journal helpers)
-  - Sai Durga / Tally PDF variants in InvoicePreview
-  - server.js update check → veeranki97/SD Dynamics
+Display name in UI / PWA / Control Panel: SD Dynamics
+Package.json name: sd-dynamics
 
-INVOICE / ERP BEHAVIOUR
-  - State → Client → Site cascade (clients only, not vendors)
-  - WO auto-fill, budget ceiling, due date +30 days
-  - Payment → journal + receipt (GL + cash book)
-  - Cost center on PO (required), expenses, receipts, purchase bills
+Custom modules: WO, PO, Vendors, Cost Centers, GL, Cash Book,
+Sai Durga/Tally PDF, Site/WO P&L, update URL = this repo.
 
-VERSIONING
-  - First fork release: 2.0.0 (see CHANGELOG.md)
-  - Bump package.json when you tag GitHub Releases
-
-RUN
-  npm install && npm run build && npm start
-  Protect the data/ folder on every update.
-
-NOT CLAIMED AS FULL TALLY/SAP
-  Full multi-currency GL rewrite, hard period lock UX, and
-  server-side RBAC for claim approval are still limited.
+npm install && npm run build && npm start
+Protect data/ on every update.
 ========================================================
