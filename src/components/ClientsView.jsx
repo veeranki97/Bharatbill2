@@ -49,7 +49,8 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
 
   const loadData = async () => {
     try {
-      const [c, b] = await Promise.all([getAllClients(), getAllBills()]);
+      const [cRaw, b] = await Promise.all([getAllClients(), getAllBills()]);
+      const c = (cRaw || []).filter(x => !x.isVendor && x.type !== 'vendor');
       setClients(c);
       setBills(b);
     } catch {
@@ -776,7 +777,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
             const clientBills = isExpanded ? getClientBills(clientName) : [];
 
             return (
-              <div key={clientName} className="glass-panel mb-4" style={{ overflow: 'hidden' }}>
+              <div key={clientName} className="glass-panel mb-4" style={{ overflow: 'visible' }}>
                 {/* Client header */}
                 <div className="client-card-header" onClick={() => setExpandedClient(isExpanded ? null : clientName)}>
                   <div className="client-card-info">
@@ -940,7 +941,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                         </table>
                       </div>
                     )}
-                    <div className="client-actions-bar" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', padding: '0.75rem 1.5rem', borderTop: '1px solid var(--border)' }}>
+                    <div className="client-actions-bar" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', padding: '0.75rem 1.5rem', borderTop: '1px solid var(--border)', overflow: 'visible', position: 'relative', zIndex: 20 }}>
                       {savedClient ? (
                         <ActionMenu items={[
                           { label: 'Edit Client', onClick: () => openEditClient(savedClient) },

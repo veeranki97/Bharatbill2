@@ -3471,3 +3471,122 @@ kbd {
 .inv-table-ruled { border-collapse: collapse !important; width: 100% !important; }
 .tally-box { border: 1.5px solid #0f172a; }
 .tally-box-title { background: #f1f5f9; border-bottom: 1.5px solid #0f172a; padding: 3px 8px; font-weight: 700; font-size: 10px; }
+
+/* ===== SD Dynamics–style Invoice Editor ===== */
+.sd-inv-form .editor-pane {
+  padding: 0.75rem 1rem 2rem !important;
+}
+.sd-inv-form .glass-panel {
+  padding: 0.75rem 1rem !important;
+  margin-bottom: 0.65rem !important;
+  border-radius: 10px;
+}
+.sd-inv-form .section-title {
+  font-size: 0.88rem !important;
+  margin-bottom: 0.45rem !important;
+}
+.sd-inv-form .form-label {
+  font-size: 0.72rem !important;
+  margin-bottom: 0.15rem !important;
+  font-weight: 600;
+  color: #64748b;
+}
+.sd-inv-form .form-input,
+.sd-inv-form select.form-input,
+.sd-inv-form textarea.form-input {
+  padding: 0.4rem 0.55rem !important;
+  font-size: 0.85rem !important;
+  min-height: 34px;
+}
+.sd-inv-form .form-group {
+  margin-bottom: 0.4rem !important;
+}
+.sd-inv-form .type-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem !important;
+}
+.sd-inv-form .type-chip {
+  padding: 0.35rem 0.65rem !important;
+  font-size: 0.78rem !important;
+}
+.sd-inv-toolbar {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.9fr 1fr 1.1fr;
+  gap: 0.5rem;
+  align-items: end;
+  margin-bottom: 0.65rem;
+  padding: 0.75rem 1rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+.sd-inv-party {
+  display: grid;
+  grid-template-columns: 1.2fr 0.9fr 0.9fr 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+.sd-inv-addr {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+.sd-inv-period {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr 0.8fr;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+.sd-inv-body {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 0.75rem;
+  align-items: start;
+}
+.sd-inv-totals {
+  position: sticky;
+  top: 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+}
+.sd-inv-totals .row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.35rem 0;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.sd-inv-totals .row.grand {
+  border-bottom: none;
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: #1d4ed8;
+  margin-top: 0.35rem;
+  padding-top: 0.5rem;
+}
+.sd-inv-form .line-item-row {
+  gap: 0.4rem !important;
+  padding: 0.4rem 0 !important;
+  border-bottom: 1px solid #f1f5f9;
+}
+.sd-inv-form .line-item-field .form-label {
+  display: none;
+}
+.sd-inv-form .line-items-header {
+  display: flex;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  padding: 0.35rem 0;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 0.25rem;
+}
+@media (max-width: 1100px) {
+  .sd-inv-toolbar, .sd-inv-party, .sd-inv-addr, .sd-inv-period { grid-template-columns: 1fr 1fr; }
+  .sd-inv-body { grid-template-columns: 1fr; }
+}

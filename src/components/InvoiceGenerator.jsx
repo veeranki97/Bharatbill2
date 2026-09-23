@@ -3,7 +3,7 @@ import { ArrowLeft, Plus, Trash2, Download, UserPlus, Pencil, Settings, ChevronU
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { saveBill, getNextInvoiceNumber, getTermsTemplates, getAllClients, saveClient, getProfile, getAllProducts, saveProduct, getInvoiceDisplayOptions, saveInvoiceDisplayOptions, getAllProfiles, getRegionMode, saveRecurring, getAllBills, getAllWorkOrders, saveJournal, getAllCostCenters } from '../store';
-import { INVOICE_TYPES, generateEWayBillJSON, formatCurrency, getCountryConfig, getStatesForCountry, getAllUnits, addCustomUnit, removeCustomUnit, calculateRoundOff, getCountriesForRegion, TDS_SECTIONS, TCS_SECTIONS, TERMS_PRESETS, getActiveAccounts, getDefaultAccount, getAccountById, getDefaultUnitForMode, filterUnitsByMode, PAPER_SIZES, getPaperSize, computeInvoiceTotals, htmlHasText } from '../utils';
+import { INVOICE_TYPES, generateEWayBillJSON, formatCurrency, getCountryConfig, getStatesForCountry, getAllUnits, addCustomUnit, removeCustomUnit, calculateRoundOff, getCountriesForRegion, TDS_SECTIONS, TCS_SECTIONS, TERMS_PRESETS, getActiveAccounts, getDefaultAccount, getAccountById, getDefaultUnitForMode, filterUnitsByMode, PAPER_SIZES, getPaperSize, computeInvoiceTotals, htmlHasText, numberToWords } from '../utils';
 // isValidIndianGSTIN used in save validation
 import { isValidIndianGSTIN as _isValidGSTIN } from '../utils';
 import { canInvoiceAgainstWO, woItemsToInvoiceItems } from '../utils/workOrder';
@@ -315,7 +315,7 @@ const LineItem = memo(function LineItem({
       </div>
       {invoiceOptions.showHSN && (
         <div className="line-item-field" style={{ flex: 1, position: 'relative' }}>
-          <label className="form-label">HSN/SAC</label>
+          <label className="form-label">SAC</label>
           <input type="text" className="form-input" value={item.hsn} list="sac-codes" placeholder="SAC/HSN"
             onChange={(e) => {
               const val = e.target.value;
@@ -2997,7 +2997,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   };
 
   return (
-    <div className="generator-container">
+    <div className="generator-container sd-inv-form">
       <div className="generator-toolbar">
         <div className="flex gap-2 items-center">
           <button className="btn btn-secondary" onClick={handleBack}><ArrowLeft size={18} /> Back</button>
@@ -3171,7 +3171,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
           {/* Invoice Type */}
           <div className="glass-panel p-6 mb-6">
             <div className="flex justify-between items-center">
-              <h3 className="section-title" style={{ margin: 0 }}>Invoice Type</h3>
+              <h3 className="section-title" style={{ margin: 0 }}>Document Type · Template</h3>
               <button type="button" className="btn btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}
                 onClick={() => setShowOptions(!showOptions)}>
                 <Settings size={15} /> {showOptions ? 'Hide Options' : 'Customize'}
@@ -3692,7 +3692,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
           {/* Client Details */}
           <div className="glass-panel p-6 mb-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="section-title" style={{ margin: 0 }}>Billed To</h3>
+              <h3 className="section-title" style={{ margin: 0 }}>Client · Site · Billing</h3>
             </div>
 
             {/* v1.10.24 — Client credit banner. Shows when the picked
@@ -3981,7 +3981,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
               </div>
 
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label className="form-label">Work Details</label>
+                <label className="form-label" style={{ fontWeight: 700, color: "#1e40af" }}>Work Description / Notes</label>
                 <textarea
                   className="form-input"
                   rows={2}
@@ -4007,7 +4007,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
 
           {/* Invoice Details */}
           <div className="glass-panel p-6 mb-6">
-            <h3 className="section-title">Invoice Details</h3>
+            <h3 className="section-title" style={{ margin: 0 }}>Invoice No · Dates · Place of Supply · WO</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="form-group">
                 <label className="form-label">Invoice Number</label>
@@ -4127,6 +4127,17 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 </label>
               )}
             </div>
+            
+            <div className="line-items-header" style={{ display: 'flex', gap: '0.4rem', fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', padding: '0.25rem 0', borderBottom: '2px solid #e2e8f0' }}>
+              <span style={{ flex: 2.5 }}>Description</span>
+              <span style={{ flex: 1 }}>CostHead *</span>
+              <span style={{ flex: 1 }}>SAC</span>
+              <span style={{ flex: 0.8 }}>Unit</span>
+              <span style={{ flex: 0.7 }}>Qty</span>
+              <span style={{ flex: 0.9 }}>Rate</span>
+              <span style={{ flex: 0.9 }}>Amount</span>
+              <span style={{ width: 36 }}></span>
+            </div>
             {items.map((item, idx) => (
               <LineItem
                 key={item.id}
@@ -4135,7 +4146,8 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 taxInclusive={taxInclusive}
                 showGST={showGST}
                 taxLabel={taxLabel}
-                units={units} costCenters={costCentersList}
+                units={units} 
+				costCenters={costCentersList}
                 countryTaxRates={countryTaxRates}
                 filterUnitsByMode={filterUnitsByMode}
                 invoiceMode={invoiceOptions.invoiceMode}
@@ -4187,6 +4199,24 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 Applied after tax. For GST-compliant pre-tax discount, use per-line discount instead.
               </span>
             </div>
+            )}
+          </div>
+
+
+          {/* SD-style tax summary (right-rail style totals under items) */}
+          <div className="sd-inv-totals" style={{ marginBottom: '0.65rem' }}>
+            <div className="form-group" style={{ marginBottom: 8 }}>
+              <label className="form-label">Tax Rate *</label>
+              <div style={{ fontWeight: 600 }}>{showGST ? 'GST (as per lines / place of supply)' : 'No GST'}</div>
+            </div>
+            <div className="row"><span>Subtotal:</span><span>{formatCurrency(Number(totals.subtotal ?? totals.subTotal) || 0, invoiceOptions.currency || 'INR')}</span></div>
+            <div className="row"><span>GST Amount:</span><span>{formatCurrency(Number(totals.totalTaxAmount ?? totals.totalTax ?? ((totals.cgst||0)+(totals.sgst||0)+(totals.igst||0)+(totals.cess||0))) || 0, invoiceOptions.currency || 'INR')}</span></div>
+            <div className="row"><span>Round Off:</span><span>{formatCurrency(Number(totals.roundOff) || 0, invoiceOptions.currency || 'INR')}</span></div>
+            <div className="row grand"><span>Grand Total:</span><span>{formatCurrency(Number(totals.total) || 0, invoiceOptions.currency || 'INR')}</span></div>
+            {invoiceOptions.showAmountWords !== false && (
+              <div style={{ marginTop: 8, fontSize: '0.78rem', fontStyle: 'italic', color: '#64748b' }}>
+                {numberToWords ? numberToWords(Math.round(Number(totals.total) || 0)) : ''}
+              </div>
             )}
           </div>
 
