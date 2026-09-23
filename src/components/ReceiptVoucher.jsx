@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Receipt, Plus, Trash2, Search, Printer, Pencil, Layers } from 'lucide-react';
-import { getAllReceipts, saveReceipt, deleteReceipt, getAllBills, getProfile, getNextInvoiceNumber, saveBill, saveJournal, getAllWorkOrders, getAllCostCenters } from '../store';
+import { getAllReceipts, saveReceipt, deleteReceipt, getAllBills, getProfile, getNextInvoiceNumber, saveBill, saveJournal, getAllWorkOrders, getAllCostCenters, getAllClients } from '../store';
 import { journalFromPayment } from '../utils/ledger';
 import { formatCurrency, numberToWords, belongsToProfile, isUnassignedToBusiness } from '../utils';
 import { planBulkAllocation } from '../utils/bulkPayment';
@@ -35,6 +35,8 @@ export default function ReceiptVoucher() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [workOrders, setWorkOrders] = useState([]);
+  const [vendorsList, setVendorsList] = useState([]);
+  const [clientsList, setClientsList] = useState([]);
   const [costCenters, setCostCenters] = useState([]);
   const [form, setForm] = useState({ ...emptyForm });
   const [previewReceipt, setPreviewReceipt] = useState(null);
@@ -67,6 +69,11 @@ export default function ReceiptVoucher() {
 
   useEffect(() => {
     getAllWorkOrders().then(setWorkOrders).catch(() => {});
+    getAllClients().then(all => {
+      const list = all || [];
+      setVendorsList(list.filter(c => c.isVendor || c.type === 'vendor'));
+      setClientsList(list.filter(c => !c.isVendor && c.type !== 'vendor'));
+    }).catch(() => {});
     getAllCostCenters().then(setCostCenters).catch(() => {});
   }, []);
   useEffect(() => {
@@ -470,7 +477,15 @@ export default function ReceiptVoucher() {
                 {['advance', 'invoice', 'vendor'].map(t => (
                   <label key={t} style={{ display: 'flex', alignItems: 'center', gap: 4, textTransform: 'capitalize' }}>
                     <input type="radio" name="paymentType" checked={form.paymentType === t}
-                      onChange={() => updateField('paymentType', t)} /> {t === 'invoice' ? 'Against invoice' : t}
+                      onChange={() => {
+                      updateField('paymentType', t);
+                      if (t === 'advance' || t === 'vendor') {
+                        getNextInvoiceNumber('ADV', { peek: true }).then(num => {
+                          const n = String(num || '');
+                          updateField('receiptNo', n.startsWith('ADV') ? n : ('ADV-' + n.replace(/^ADV[-/]?/i,'')));
+                        }).catch(() => {});
+                      }
+                    }} /> {t === 'invoice' ? 'Against invoice' : t}
                   </label>
                 ))}
               </div>
@@ -522,7 +537,12 @@ export default function ReceiptVoucher() {
               </div>
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
                 <label className="form-label">Received From (Client Name) *</label>
-                <input type="text" className="form-input" value={form.clientName} onChange={e => updateField('clientName', e.target.value)} />
+                <input type="text" className="form-input" list="rcpt-party-list" value={form.clientName} onChange={e => updateField('clientName', e.target.value)} placeholder={form.paymentType==='vendor'?'Select or type vendor…':'Client name'} />
+                <datalist id="rcpt-party-list">
+                  {(form.paymentType === 'vendor' ? vendorsList : clientsList).map(p => (
+                    <option key={p.id} value={p.name}>{p.gstin || p.city || ''}</option>
+                  ))}
+                </datalist>
               </div>
               <div className="form-group">
                 <label className="form-label">Amount *</label>

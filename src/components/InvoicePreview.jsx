@@ -1054,6 +1054,7 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
                   </div>
                 </td>
               </tr>
+
               {details?.workDetails && (
                 <tr>
                   <td colSpan={2} style={{ borderBottom: '1px solid #111', padding: 8 }}>
@@ -1063,17 +1064,189 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
               )}
             </tbody>
           </table>
+
+          {/* ===== TALLY STRICT LINE ITEMS TABLE ===== */}
+          <table className="inv-table-tally" style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: 10, marginTop: 0 }}>
+            <thead>
+              <tr style={{ background: '#f0f0f0' }}>
+                <th style={{ border: '1px solid #000', padding: 4, width: 28 }}>#</th>
+                <th style={{ border: '1px solid #000', padding: 4, textAlign: 'left' }}>Description of Goods / Services</th>
+                {showHSN && <th style={{ border: '1px solid #000', padding: 4 }}>HSN/SAC</th>}
+                {showItemQty && <th style={{ border: '1px solid #000', padding: 4 }}>Qty</th>}
+                {showRateColumn && <th style={{ border: '1px solid #000', padding: 4 }}>Rate</th>}
+                <th style={{ border: '1px solid #000', padding: 4 }}>Taxable</th>
+                {showGST && isIndia && !isInterstate && (
+                  <>
+                    <th style={{ border: '1px solid #000', padding: 4 }}>CGST%</th>
+                    <th style={{ border: '1px solid #000', padding: 4 }}>CGST Amt</th>
+                    <th style={{ border: '1px solid #000', padding: 4 }}>SGST%</th>
+                    <th style={{ border: '1px solid #000', padding: 4 }}>SGST Amt</th>
+                  </>
+                )}
+                {showGST && isIndia && isInterstate && (
+                  <>
+                    <th style={{ border: '1px solid #000', padding: 4 }}>IGST%</th>
+                    <th style={{ border: '1px solid #000', padding: 4 }}>IGST Amt</th>
+                  </>
+                )}
+                <th style={{ border: '1px solid #000', padding: 4 }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(items || []).map((item, index) => {
+                const lineAmount = (Number(item.quantity) || 0) * (Number(item.rate) || 0);
+                const discount = resolveLineDiscount(item);
+                const grossAfterDiscount = Math.max(0, lineAmount - discount);
+                const taxRate = item.taxPercent || 0;
+                const isTaxInclusive = totals.taxInclusive;
+                const afterDiscount = isTaxInclusive && showGST ? grossAfterDiscount / (1 + taxRate / 100) : grossAfterDiscount;
+                const taxAmount = isTaxInclusive && showGST ? grossAfterDiscount - afterDiscount : afterDiscount * taxRate / 100;
+                const halfRate = taxRate / 2;
+                const halfTax = taxAmount / 2;
+                const lineTotal = afterDiscount + (showGST ? taxAmount : 0);
+                return (
+                  <tr key={item.id || index}>
+                    <td style={{ border: '1px solid #000', padding: 4, textAlign: 'center' }}>{index + 1}</td>
+                    <td style={{ border: '1px solid #000', padding: 4 }}>{item.name || '-'}{item.description ? <div style={{ fontSize: 9, color: '#333' }}>{item.description}</div> : null}</td>
+                    {showHSN && <td style={{ border: '1px solid #000', padding: 4, textAlign: 'center' }}>{item.hsn || '-'}</td>}
+                    {showItemQty && <td style={{ border: '1px solid #000', padding: 4, textAlign: 'center' }}>{item.quantity}{showItemUnit && item.unit ? ` ${item.unit}` : ''}</td>}
+                    {showRateColumn && <td style={{ border: '1px solid #000', padding: 4, textAlign: 'right' }}>{fmt(item.rate)}</td>}
+                    <td style={{ border: '1px solid #000', padding: 4, textAlign: 'right' }}>{fmt(afterDiscount)}</td>
+                    {showGST && isIndia && !isInterstate && (
+                      <>
+                        <td style={{ border: '1px solid #000', padding: 4, textAlign: 'center' }}>{halfRate}%</td>
+                        <td style={{ border: '1px solid #000', padding: 4, textAlign: 'right' }}>{fmt(halfTax)}</td>
+                        <td style={{ border: '1px solid #000', padding: 4, textAlign: 'center' }}>{halfRate}%</td>
+                        <td style={{ border: '1px solid #000', padding: 4, textAlign: 'right' }}>{fmt(halfTax)}</td>
+                      </>
+                    )}
+                    {showGST && isIndia && isInterstate && (
+                      <>
+                        <td style={{ border: '1px solid #000', padding: 4, textAlign: 'center' }}>{taxRate}%</td>
+                        <td style={{ border: '1px solid #000', padding: 4, textAlign: 'right' }}>{fmt(taxAmount)}</td>
+                      </>
+                    )}
+                    <td style={{ border: '1px solid #000', padding: 4, textAlign: 'right', fontWeight: 600 }}>{fmt(lineTotal)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Totals + Amount in Words bordered */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: 10 }}>
+            <tbody>
+              <tr>
+                <td style={{ border: '1px solid #000', padding: 8, width: '58%', verticalAlign: 'top' }}>
+                  {showAmountWords && (
+                    <>
+                      <strong>Amount in Words:</strong>
+                      <div style={{ marginTop: 4, fontStyle: 'italic' }}>{amountInWords(totals.total)}</div>
+                    </>
+                  )}
+                  {qrDataUrl && (
+                    <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <img src={qrDataUrl} alt="UPI" style={{ width: 72, height: 72 }} />
+                      <div>UPI: {upiId}<br />{fmt(totals.total)}</div>
+                    </div>
+                  )}
+                </td>
+                <td style={{ border: '1px solid #000', padding: 0, verticalAlign: 'top' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                    <tbody>
+                      {showSubtotal && (
+                        <tr>
+                          <td style={{ borderBottom: '1px solid #000', padding: '4px 8px' }}>Taxable Value</td>
+                          <td style={{ borderBottom: '1px solid #000', padding: '4px 8px', textAlign: 'right' }}>{fmt(totals.subtotal)}</td>
+                        </tr>
+                      )}
+                      {showGST && isIndia && isInterstate && (
+                        <tr>
+                          <td style={{ borderBottom: '1px solid #000', padding: '4px 8px' }}>IGST</td>
+                          <td style={{ borderBottom: '1px solid #000', padding: '4px 8px', textAlign: 'right' }}>{fmt(totals.igst)}</td>
+                        </tr>
+                      )}
+                      {showGST && isIndia && !isInterstate && (
+                        <>
+                          <tr>
+                            <td style={{ borderBottom: '1px solid #000', padding: '4px 8px' }}>CGST</td>
+                            <td style={{ borderBottom: '1px solid #000', padding: '4px 8px', textAlign: 'right' }}>{fmt(totals.cgst)}</td>
+                          </tr>
+                          <tr>
+                            <td style={{ borderBottom: '1px solid #000', padding: '4px 8px' }}>SGST</td>
+                            <td style={{ borderBottom: '1px solid #000', padding: '4px 8px', textAlign: 'right' }}>{fmt(totals.sgst)}</td>
+                          </tr>
+                        </>
+                      )}
+                      {totals.roundOff !== undefined && totals.roundOff !== 0 && (
+                        <tr>
+                          <td style={{ borderBottom: '1px solid #000', padding: '4px 8px' }}>Round Off</td>
+                          <td style={{ borderBottom: '1px solid #000', padding: '4px 8px', textAlign: 'right' }}>{totals.roundOff > 0 ? '+' : ''}{fmt(totals.roundOff)}</td>
+                        </tr>
+                      )}
+                      <tr>
+                        <td style={{ padding: '6px 8px', fontWeight: 800 }}>Grand Total</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 800 }}>{fmt(totals.total)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Bank box */}
+          {showBankDetails && (account?.bankName || profile?.bankName) && (
+            <div style={{ border: '1px solid #000', borderTop: 'none', padding: 8, fontSize: 10 }}>
+              <strong>Bank Details</strong>
+              <div>A/C Name: {account?.accountHolderName || profile?.businessName}</div>
+              <div>Bank: {account?.bankName || profile?.bankName} · A/C: {account?.accountNumber || profile?.accountNumber}</div>
+              {(account?.ifsc || profile?.ifsc) && <div>IFSC: {account?.ifsc || profile?.ifsc}</div>}
+              {profile?.pan && isIndia && <div>PAN: {profile.pan}</div>}
+            </div>
+          )}
+
+          {/* Declaration + signature */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', borderTop: 'none', fontSize: 9 }}>
+            <tbody>
+              <tr>
+                <td style={{ borderRight: '1px solid #000', padding: 8, width: '62%', verticalAlign: 'top' }}>
+                  <strong>Declaration</strong>
+                  <p style={{ margin: '4px 0 0', fontSize: 8, lineHeight: 1.35 }}>
+                    Certified that the particulars given above are true and correct and the amount indicated represents the price actually charged and that there is no flow of additional consideration directly or indirectly from the buyer.
+                  </p>
+                  {documentFingerprintResolved && (
+                    <p style={{ margin: '6px 0 0', fontSize: 7, color: '#444' }}>SHA-256: {documentFingerprintResolved}</p>
+                  )}
+                  <p style={{ margin: '4px 0 0', fontSize: 7, color: '#666' }}>
+                    This is a Computer Generated Transaction — Generated on {new Date().toLocaleString('en-IN')}
+                  </p>
+                </td>
+                <td style={{ padding: 8, textAlign: 'center', verticalAlign: 'top', minHeight: 90 }}>
+                  <div style={{ border: '1px solid #000', minHeight: 88, padding: 6 }}>
+                    <div style={{ fontSize: 10 }}>For <strong>{profile?.businessName || 'Company'}</strong></div>
+                    {showSignature && (profile?.signature || _ps.signatureImage) && (
+                      <img src={profile?.signature || _ps.signatureImage} alt="Sign" style={{ maxHeight: 40, margin: '6px auto', display: 'block' }} />
+                    )}
+                    <div style={{ marginTop: 28, fontSize: 9, borderTop: '1px solid #000', paddingTop: 4 }}>Authorised Signatory</div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       )}
 
-      {!hideHeaderBecauseLetterhead && pdfStyleVariant !== 'saidurga' && pdfStyle === 'modern' && renderModernHeader()}
-      {!hideHeaderBecauseLetterhead && pdfStyleVariant !== 'saidurga' && pdfStyle === 'minimal' && renderMinimalHeader()}
-      {!hideHeaderBecauseLetterhead && pdfStyleVariant !== 'saidurga' && pdfStyle === 'classic' && renderClassicHeader()}
+      {!hideHeaderBecauseLetterhead && pdfStyleVariant !== 'saidurga' && pdfStyleVariant !== 'tally' && pdfStyle === 'modern' && renderModernHeader()}
+      {!hideHeaderBecauseLetterhead && pdfStyleVariant !== 'saidurga' && pdfStyleVariant !== 'tally' && pdfStyle === 'minimal' && renderMinimalHeader()}
+      {!hideHeaderBecauseLetterhead && pdfStyleVariant !== 'saidurga' && pdfStyleVariant !== 'tally' && pdfStyle === 'classic' && renderClassicHeader()}
 
-      {renderParties()}
+      {(pdfStyleVariant !== 'saidurga' && pdfStyleVariant !== 'tally') && renderParties()}
 
-      {/* Items table */}
-      <table className="inv-table" style={{ tableLayout: 'auto', ...(pdfStyle === 'modern' ? { margin: '0 2rem', width: 'calc(100% - 4rem)' } : pdfStyle === 'minimal' ? { margin: '0 2rem', width: 'calc(100% - 4rem)', borderTop: 'none' } : {}) }}>
+      {/* Items table — skipped for Sai Durga / Tally full layout above */}
+      {(pdfStyleVariant !== 'saidurga' && pdfStyleVariant !== 'tally') && (
+      <>
+      <table className={`inv-table ${(pdfStyleVariant==='tally')?'inv-table-tally':''}`} style={{ tableLayout: 'auto', ...(pdfStyle === 'modern' ? { margin: '0 2rem', width: 'calc(100% - 4rem)' } : pdfStyle === 'minimal' ? { margin: '0 2rem', width: 'calc(100% - 4rem)', borderTop: 'none' } : {}) }}>
         <thead>
           {showGST ? (
             isIndia && isInterstate ? (
@@ -1466,8 +1639,12 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
           if (!showSignature || !sigImg) return null;
           return (
             <div className="inv-signature">
-              {showSignatoryText && <p className="inv-sig-label">Authorized Signatory
-            <div style={{ color: '#16a34a', fontSize: '0.72rem', fontWeight: 600, marginTop: 4 }}>✓ Signature Valid</div></p>}
+              {showSignatoryText && (
+                <p className="inv-sig-label">
+                  Authorized Signatory
+                  <span style={{ display: 'block', color: '#16a34a', fontSize: '0.72rem', fontWeight: 600, marginTop: 4 }}>✓ Signature Valid</span>
+                </p>
+              )}
               <img src={sigImg} alt="Signature" style={{
                 maxHeight: '60px', maxWidth: '180px', objectFit: 'contain',
                 display: 'block', marginLeft: 'auto', marginBottom: '0.4rem'
@@ -1477,6 +1654,9 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
           );
         })()}
       </div>
+
+      </>
+      )}
 
       {/* Extra Sections - each starts on new page */}
       {(() => {

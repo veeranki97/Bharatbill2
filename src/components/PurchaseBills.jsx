@@ -49,6 +49,9 @@ const emptyForm = {
   interstate: false, // true ⇒ supplier charged IGST; false ⇒ CGST + SGST. Routes ITC correctly in GSTR-3B.
   applyRoundOff: false, // off by default — purchase bill totals are usually pre-rounded by the supplier. Users with suppliers that don't pre-round can opt in here.
   note: '',
+  workOrderId: '',
+  costCenterId: '',
+  site: '',
 };
 
 function calcItemTax(item) {
@@ -954,7 +957,34 @@ export default function PurchaseBills() {
                   onChange={e => updateField('supplierAddress', e.target.value)}
                   placeholder="Street, City, State — printed on the Purchase Bill PDF" />
               </div>
+              
               <div className="form-group">
+                <label className="form-label">Work Order</label>
+                <select className="form-input" value={form.workOrderId || ''}
+                  onChange={e => {
+                    const id = e.target.value;
+                    const wo = (purchaseWOs || []).find(w => w.id === id);
+                    updateField('workOrderId', id);
+                    if (wo?.costCenterId) updateField('costCenterId', wo.costCenterId);
+                    if (wo?.site) updateField('site', wo.site);
+                  }}>
+                  <option value="">— Link Work Order —</option>
+                  {(purchaseWOs || []).map(wo => (
+                    <option key={wo.id} value={wo.id}>{wo.woNumber} — {wo.site || wo.clientName || ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Cost Center</label>
+                <select className="form-input" value={form.costCenterId || ''}
+                  onChange={e => updateField('costCenterId', e.target.value)}>
+                  <option value="">— None —</option>
+                  {(purchaseCCs || []).map(cc => (
+                    <option key={cc.id || cc.name} value={cc.id || cc.name}>{cc.name || cc.id}</option>
+                  ))}
+                </select>
+              </div>
+<div className="form-group">
                 <label className="form-label">Invoice Number *</label>
                 <input type="text" className="form-input" value={form.invoiceNumber}
                   onChange={e => updateField('invoiceNumber', e.target.value)} placeholder="Supplier invoice no." />

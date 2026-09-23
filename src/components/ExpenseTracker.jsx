@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Wallet, Plus, Edit3, Trash2, Search, X, Save, Download, Calendar } from 'lucide-react';
-import { getAllExpenses, saveExpense, deleteExpense, getProfile, getAllWorkOrders, getAllBills, getAllCostCenters } from '../store';
+import { getAllExpenses, saveExpense, deleteExpense, getProfile, getAllWorkOrders, getAllBills, getAllCostCenters, getAllClients } from '../store';
 import { formatCurrency, getFYOptions, belongsToProfile, isUnassignedToBusiness, toCsvLine } from '../utils';
 import UnassignedBanner from './UnassignedBanner';
 import { toast } from './Toast';
@@ -82,6 +82,7 @@ export default function ExpenseTracker() {
   });
   const [newCatName, setNewCatName] = useState('');
   const [workOrders, setWorkOrders] = useState([]);
+  const [expenseVendors, setExpenseVendors] = useState([]);
   const [costCenters, setCostCenters] = useState([]);
   // v1.10.65 (#58 item 3) — the business these records belong to.
   const [ownerProfile, setOwnerProfile] = useState(null);
@@ -113,6 +114,7 @@ export default function ExpenseTracker() {
     })));
     loadExpenses();
     getAllWorkOrders().then(setWorkOrders).catch(() => {});
+    getAllClients().then(all => setExpenseVendors((all||[]).filter(c => c.isVendor || c.type === 'vendor'))).catch(() => {});
     getAllCostCenters().then(setCostCenters).catch(() => {});
   };
 
@@ -357,9 +359,8 @@ export default function ExpenseTracker() {
               </div>
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
                 <label className="form-label">Description *</label>
-                <label className="form-label">Work Order ID (or leave blank if receipt attached)</label>
-                <input type="text" className="form-input" value={form.workOrderId || ''} list="exp-wo-list" placeholder="Select or type WO"
-                  onChange={e => updateField('workOrderId', e.target.value)} />
+                <label className="form-label">Work Order (optional if receipt attached)</label>
+                <span className="field-hint">Use Work Order dropdown below</span>
                 <datalist id="exp-wo-list">
                   {(woList||[]).map(w => <option key={w.id} value={w.woNumber}>{w.clientName} — {w.title||''}</option>)}
                 </datalist>
@@ -398,7 +399,15 @@ export default function ExpenseTracker() {
               <div className="form-group">
                 <label className="form-label">Vendor Name</label>
                 <input type="text" className="form-input" value={form.vendorName}
-                  onChange={e => updateField('vendorName', e.target.value)} placeholder="Optional" />
+                  list="expense-vendor-list"
+                  onChange={e => {
+                    updateField('vendorName', e.target.value);
+                    const v = (expenseVendors || []).find(x => x.name === e.target.value);
+                    if (v?.gstin) updateField('vendorGstin', v.gstin);
+                  }} placeholder="Select from vendors or type" />
+                <datalist id="expense-vendor-list">
+                  {(expenseVendors || []).map(v => <option key={v.id} value={v.name} />)}
+                </datalist>
               </div>
               <div className="form-group">
                 <label className="form-label">Vendor GSTIN</label>

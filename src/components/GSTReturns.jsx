@@ -176,10 +176,20 @@ function buildReconciliation(twoBData, purchases) {
 function billIsInterstate(bill) {
   const saved = bill.data?.totals?.isInterstate;
   if (typeof saved === 'boolean') return saved;
+  // Prefer tax amounts: if IGST was charged, treat as inter-state
+  const tot = bill.data?.totals || {};
+  if ((Number(tot.igst) || 0) > 0.009 && (Number(tot.cgst) || 0) < 0.009) return true;
+  if ((Number(tot.cgst) || 0) > 0.009 || (Number(tot.sgst) || 0) > 0.009) return false;
   const prof = bill.data?.profile;
   const client = bill.data?.client;
   const details = bill.data?.details;
   if (client?.isSEZ) return true;
+  // GSTIN first 2 digits = state code
+  const sellerCode = (prof?.gstin || '').toString().slice(0, 2);
+  const clientCode = (client?.gstin || '').toString().slice(0, 2);
+  if (sellerCode && clientCode && /^[0-9]{2}$/.test(sellerCode) && /^[0-9]{2}$/.test(clientCode)) {
+    return sellerCode !== clientCode;
+  }
   const sellerState = (prof?.state || '').trim().toLowerCase();
   const placeOfSupply = (details?.placeOfSupply || client?.state || '').trim().toLowerCase();
   if (!sellerState || !placeOfSupply) return false;

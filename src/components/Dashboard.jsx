@@ -1528,6 +1528,21 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
                       {visibleColumns.actions && <td>
                         <div className="table-actions">
                           <button className="icon-btn icon-btn-blue" onClick={() => handleView(bill)} title="Edit"><Edit3 size={15} /></button>
+                          <button className="icon-btn icon-btn-blue" onClick={async () => {
+                            try {
+                              toast('Preparing PDF…', 'info', 1500);
+                              const blob = await generateSingleBillPdfBlob(bill);
+                              const a = document.createElement('a');
+                              a.href = URL.createObjectURL(blob);
+                              a.download = `${bill.invoiceNumber || 'invoice'}.pdf`;
+                              a.click();
+                              URL.revokeObjectURL(a.href);
+                              toast('PDF downloaded', 'success');
+                            } catch (e) {
+                              console.error(e);
+                              toast('PDF download failed', 'error');
+                            }
+                          }} title="Download PDF"><Download size={15} /></button>
                           <button className="icon-btn icon-btn-blue" onClick={() => onDuplicate(bill)} title="Duplicate"><Copy size={15} /></button>
                           {(bill.invoiceType === 'proforma' || bill.invoiceType === 'delivery-challan') && (
                             <button className="icon-btn icon-btn-green" onClick={() => onConvert(bill)} title="Convert to Tax Invoice"><FileText size={15} /></button>

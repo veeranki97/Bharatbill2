@@ -155,7 +155,7 @@ const DEFAULT_OPTIONS = {
   selectedAccountId: null,   // null ⇒ resolve via last-used / default / first-active at render time
   showAccountLabel: false,   // when true, prints "Pay via: <account label>" above the bank block
   accentColor: '',
-  pdfStyle: 'classic',
+  pdfStyle: 'saidurga',
   // v1.10.22 — invoice-level (whole-bill) discount. Treated as a cash
   // discount / trade allowance applied AFTER tax. Doesn't affect the
   // GSTR-1 taxable value (which per Section 15(3) requires pre-supply
@@ -183,6 +183,8 @@ const ACCENT_PRESETS = [
 ];
 
 const PDF_STYLES = [
+  { id: 'saidurga', label: 'Sai Durga', desc: 'Traditional Indian tax invoice' },
+  { id: 'tally', label: 'Tally', desc: 'Ruled grid Tally-style' },
   { id: 'classic', label: 'Classic', desc: 'Clean with top accent bar' },
   { id: 'modern', label: 'Modern', desc: 'Bold header with color block' },
   { id: 'minimal', label: 'Minimal', desc: 'Simple, borderless layout' },
@@ -275,7 +277,7 @@ const LineItem = memo(function LineItem({
   units, countryTaxRates, filterUnitsByMode, invoiceMode, costCenters,
   currency, profileCountry, suggestions,
   onFieldChange, onSelectProduct, onSetProductSearch,
-  onAddCustomUnit, onRemoveCustomUnit, onRemove, clampNonNeg,
+  onAddCustomUnit, onAddCustomSac, onRemoveCustomUnit, onRemove, clampNonNeg,
   isLastRow, onAddRow,
 }) {
   // v1.10.37 — Keyboard shortcut: Enter on any input inside the LAST
@@ -296,7 +298,7 @@ const LineItem = memo(function LineItem({
   };
   return (
     <div className="line-item-row sd-line-grid" data-item-id={item.id} onKeyDown={handleRowKeyDown}
-      style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 0.7fr 0.8fr 0.9fr 0.9fr 0.7fr auto', gap: 6, alignItems: 'end', width: '100%' }}>
+      style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 0.7fr 0.8fr 0.9fr 0.9fr 0.9fr 0.7fr auto', gap: 6, alignItems: 'end', width: '100%' }}>
       <div className="line-item-field" style={{ position: 'relative', minWidth: 0 }}>
         <label className="form-label">Description</label>
         {/* v1.10.37 — Keyboard nav on product suggestions. Reported:
@@ -327,18 +329,31 @@ const LineItem = memo(function LineItem({
       {(
         <div className="line-item-field" style={{ position: 'relative', minWidth: 0 }}>
           <label className="form-label">SAC</label>
-          <input type="text" className="form-input" value={item.hsn} list="sac-codes" placeholder="SAC/HSN"
+          <select className="form-input" value={item.hsn || ''}
             onChange={(e) => {
               const val = e.target.value;
+              if (val === '__custom__') {
+                onAddCustomSac?.(item.id);
+                return;
+              }
               onFieldChange(item.id, 'hsn', val);
-              // v1.10.22 — Suggest GST rate from a curated HSN/SAC table.
-              // Only overwrites the tax rate when the user has NOT already
-              // typed a custom rate (default 18 is treated as "unset").
               const suggested = suggestGstRate(val);
               if (suggested && (item.taxPercent === undefined || item.taxPercent === 18 || item.taxPercent === 0)) {
                 onFieldChange(item.id, 'taxPercent', suggested.rate);
               }
-            }} />
+            }}>
+            <option value="">— SAC/HSN —</option>
+            {item.hsn && ![...(() => { try { return JSON.parse(localStorage.getItem('fgsb_custom_sac')||'[]'); } catch { return []; } })()].includes(item.hsn) && (
+              <option value={item.hsn}>{item.hsn}</option>
+            )}
+            {(() => {
+              try { return JSON.parse(localStorage.getItem('fgsb_custom_sac') || '[]'); } catch { return []; }
+            })().map(c => <option key={c} value={c}>{c}</option>)}
+            {['998311','998312','998313','998314','998399','998599','9954','9965','9972'].map(c => (
+              <option key={'d'+c} value={c}>{c}</option>
+            ))}
+            <option value="__custom__">＋ Add SAC/HSN…</option>
+          </select>
           {/* Show the label of the matched HSN inline so the user can
               confirm the code is right. Hidden until at least 4 chars. */}
           {(() => {
@@ -393,6 +408,12 @@ const LineItem = memo(function LineItem({
         <label className="form-label">Rate</label>
         <input type="number" min="0" step="any" className="form-input" value={item.rate}
           onChange={(e) => onFieldChange(item.id, 'rate', clampNonNeg(e.target.value))} />
+      </div>
+      <div className="line-item-field" style={{ minWidth: 0 }}>
+        <label className="form-label">Amount</label>
+        <input type="text" className="form-input" readOnly
+          value={((Number(item.quantity) || 0) * (Number(item.rate) || 0)).toFixed(2)}
+          style={{ background: 'var(--bg-secondary, #f1f5f9)', fontWeight: 600 }} />
       </div>
       {false && invoiceOptions.showDiscount && (
         <div className="line-item-field" style={{ flex: 1.8, minWidth: 200 }}>
@@ -478,24 +499,7 @@ const LineItem = memo(function LineItem({
           option so user can directly enter product description into
           invoice directly". Hidden by default; expands on click. Persists
           with the item and renders under the item name in the PDF/preview. */}
-      <div className="line-item-description-row" style={{ flexBasis: '100%', marginTop: 4 }}>
-        {item.description || item._descOpen ? (
-          <textarea
-            className="form-input"
-            rows={2}
-            placeholder="Description (optional, shown under this line in the PDF)"
-            value={item.description || ''}
-            onChange={(e) => onFieldChange(item.id, 'description', e.target.value)}
-            style={{ fontSize: '0.82rem', resize: 'vertical', minHeight: 40 }} />
-        ) : (
-          <button type="button" className="btn btn-secondary"
-            onClick={() => onFieldChange(item.id, '_descOpen', true)}
-            style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', color: 'var(--text-muted)' }}
-            title="Add a description that will show under this line in the PDF">
-            + Add description
-          </button>
-        )}
-      </div>
+      {/* Line description uses main Description field only */}
     </div>
   );
 });
@@ -637,8 +641,13 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       // user-preference stores (localStorage / server). Strip on read so
       // opening Invoice B doesn't pick up Invoice A's snapshot.
       delete persisted.paymentAccountSnapshot;
-      // Persisted options are the user's defaults, draft can override for in-progress work
-      return { ...DEFAULT_OPTIONS, ...persisted, ...(draft?.invoiceOptions || {}) };
+      // Seed pdfStyle from Print Settings when opening a new invoice
+      let seed = { ...DEFAULT_OPTIONS, ...persisted, ...(draft?.invoiceOptions || {}) };
+      try {
+        const tpl = getPrintSettings().pdfTemplate;
+        if (tpl && (!seed.pdfStyle || seed.pdfStyle === 'classic')) seed = { ...seed, pdfStyle: tpl };
+      } catch { /* ignore */ }
+      return seed;
     } catch { return draft?.invoiceOptions || { ...DEFAULT_OPTIONS }; }
   });
   const [showOptions, setShowOptions] = useState(false);
@@ -1318,7 +1327,34 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     handleItemChange(itemId, 'unit', trimmed);
   }, [handleItemChange]);
 
-  const handleRemoveCustomUnit = useCallback(async (label) => {
+  const handleAddCustomSac = useCallback(async (itemId) => {
+    const code = await promptAction({
+      title: 'Add SAC / HSN code',
+      message: 'Enter a SAC or HSN code. Saved for reuse on future invoices.',
+      placeholder: 'e.g. 998311',
+      confirmLabel: 'Add SAC',
+    });
+    if (!code) return;
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed) return;
+    if (trimmed.length > 12) { toast('SAC/HSN must be 12 characters or less', 'error'); return; }
+    try {
+      const key = 'fgsb_custom_sac';
+      const list = JSON.parse(localStorage.getItem(key) || '[]');
+      if (!list.includes(trimmed)) {
+        list.push(trimmed);
+        localStorage.setItem(key, JSON.stringify(list));
+      }
+    } catch { /* ignore */ }
+    handleItemChange(itemId, 'hsn', trimmed);
+    try {
+      const suggested = suggestGstRate(trimmed);
+      if (suggested) handleItemChange(itemId, 'taxPercent', suggested.rate);
+    } catch { /* ignore */ }
+    toast(`SAC "${trimmed}" added`, 'success');
+  }, [handleItemChange]);
+
+    const handleRemoveCustomUnit = useCallback(async (label) => {
     if (!await confirmAction({
       title: `Remove custom unit "${label}"?`,
       message: 'Existing invoices keep this label unchanged. It just no longer appears in the unit dropdowns.',
@@ -1378,7 +1414,24 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       email: cli.email || '',
       phone: cli.phone || '',
       isSEZ: !!cli.isSEZ,
+      site: cli.site || (Array.isArray(cli.sites) && cli.sites[0]) || '',
     });
+    // Place of Supply from client state / GSTIN (still overridable in dropdown)
+    const STATE_BY_GST = {
+      '01':'Jammu and Kashmir','02':'Himachal Pradesh','03':'Punjab','04':'Chandigarh',
+      '05':'Uttarakhand','06':'Haryana','07':'Delhi','08':'Rajasthan','09':'Uttar Pradesh',
+      '10':'Bihar','11':'Sikkim','12':'Arunachal Pradesh','13':'Nagaland','14':'Manipur',
+      '15':'Mizoram','16':'Tripura','17':'Meghalaya','18':'Assam','19':'West Bengal',
+      '20':'Jharkhand','21':'Odisha','22':'Chhattisgarh','23':'Madhya Pradesh','24':'Gujarat',
+      '27':'Maharashtra','29':'Karnataka','30':'Goa','32':'Kerala','33':'Tamil Nadu',
+      '34':'Puducherry','36':'Telangana','37':'Andhra Pradesh','38':'Ladakh'
+    };
+    const gCode = (cli.gstin || '').toString().replace(/[^0-9A-Z]/gi, '').slice(0, 2);
+    const pos = cli.state || STATE_BY_GST[gCode] || '';
+    if (pos) {
+      setDetails(prev => ({ ...prev, placeOfSupply: pos }));
+      setFilterState(pos);
+    }
     setSelectedClientId(cli.id);
     setShowClientSuggestions(false);
     // v1.9.1 — auto-apply per-client print preferences (if set on the client
@@ -3963,14 +4016,22 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                         };
                         const st = STATE_BY_GST[code];
                         setClient({ ...client, gstin: g, ...(st ? { state: st } : {}) });
+                        if (st) setDetails(prev => ({ ...prev, placeOfSupply: st }));
                       }} placeholder="Optional — state auto from GSTIN" maxLength={20} />
                   </div>
                 );
               })()}
             </div>
 
-            {/* Work Order link (custom addition) */}
-            <div className="form-group full-width" style={{ marginTop: '1rem' }}>
+            {/* Billing Address + Work Order side by side */}
+            <div className="grid grid-cols-2 gap-4" style={{ marginTop: '1rem' }}>
+            <div className="form-group">
+              <label className="form-label">Billing Address (shown above)</label>
+              <textarea className="form-input" rows={2} readOnly
+                value={[client.address, client.city, client.pin, client.state].filter(Boolean).join(', ')}
+                placeholder="Filled from client" style={{ background: 'var(--bg-secondary, #f8fafc)', fontSize: '0.85rem' }} />
+            </div>
+            <div className="form-group">
               <label className="form-label">Link to Work Order (optional)</label>
               <select
                 className="form-input"
@@ -3982,37 +4043,77 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                   const wo = workOrders.find(w => w.id === id);
                   if (!wo) return;
                   // Auto-fill from WO: items, site, period, client if empty
-                  if (wo.clientName && !client.name?.trim()) {
-                    setClient(prev => ({ ...prev, name: wo.clientName }));
-                  }
-                  if (wo.site) {
+                  // Full populate from Work Order
+                  const master = (savedClients || []).find(c =>
+                    (c.name || '').trim().toLowerCase() === (wo.clientName || '').trim().toLowerCase()
+                  );
+                  if (wo.clientName) {
+                    setClient(prev => ({
+                      ...prev,
+                      name: wo.clientName || prev.name,
+                      site: wo.site || prev.site,
+                      address: master?.address || prev.address,
+                      city: master?.city || prev.city,
+                      pin: master?.pin || prev.pin,
+                      state: master?.state || prev.state,
+                      gstin: master?.gstin || prev.gstin,
+                      phone: master?.phone || prev.phone,
+                      email: master?.email || prev.email,
+                    }));
+                    if (master?.state) {
+                      setDetails(d => ({ ...d, placeOfSupply: master.state }));
+                      setFilterState(master.state);
+                    }
+                  } else if (wo.site) {
                     setClient(prev => ({ ...prev, site: wo.site }));
                   }
                   setDetails(prev => ({
                     ...prev,
                     periodStart: wo.periodStart || prev.periodStart || '',
                     periodEnd: wo.periodEnd || prev.periodEnd || '',
-                    workDetails: prev.workDetails || wo.desc || wo.description || prev.workDetails || '',
+                    workDetails: wo.workDetails || wo.desc || wo.description || wo.notes || prev.workDetails || '',
                     site: wo.site || prev.site || '',
                     workOrderNo: wo.woNumber || wo.woNo || wo.number || prev.workOrderNo || '',
                   }));
+                  if (wo.notes || wo.terms) {
+                    if (wo.notes) setCustomNotes(wo.notes);
+                    if (wo.terms) setCustomTerms(wo.terms);
+                  }
                   if (wo.items && wo.items.length) {
                     const mapped = woItemsToInvoiceItems(wo.items, allBillsForCredit, wo);
                     if (mapped.length) setItems(mapped);
+                    else {
+                      // Fallback map if helper filters everything
+                      setItems(wo.items.map((it, idx) => ({
+                        id: 'item_' + Date.now().toString(36) + '_' + idx,
+                        name: it.description || it.name || '',
+                        hsn: it.hsn || '',
+                        quantity: Number(it.qty) || Number(it.quantity) || 1,
+                        unit: it.unit || 'Nos',
+                        rate: Number(it.rate) || 0,
+                        discount: 0,
+                        taxPercent: Number(it.taxPercent) || 18,
+                        cessPercent: 0,
+                        costCenterId: it.costCenterId || it.costHead || '',
+                      })));
+                    }
                   }
-                  toast(`Filled from Work Order ${wo.woNumber}`, 'success');
+                  toast(`Filled from Work Order ${wo.woNumber || id}`, 'success');
                 }}
               >
                 <option value="">— No Work Order —</option>
                 {workOrders
                   .filter(wo => {
+                    const st = (wo.status || '').toLowerCase();
+                    if (st === 'cancelled' || st === 'canceled' || st === 'void') return false;
+                    if (selectedWorkOrderId === wo.id) return true;
+                    // Show all active WOs; if client already chosen, prefer matching but still list others
                     if (!client.name?.trim()) return true;
-                    return (wo.clientName || '').trim().toLowerCase() === client.name.trim().toLowerCase();
+                    return true; // do not hide WOs — user may invoice before selecting client
                   })
-                  .filter(wo => wo.status === 'approved' || wo.status === 'in-progress' || wo.status === 'completed' || selectedWorkOrderId === wo.id)
                   .map(wo => (
                     <option key={wo.id} value={wo.id}>
-                      {wo.woNumber} — {wo.title || wo.clientName} (Budget: ₹{Number(wo.approvedBudget || 0).toLocaleString('en-IN')})
+                      {wo.woNumber || wo.id} — {wo.title || wo.clientName || 'WO'}{wo.site ? ` · ${wo.site}` : ''} (₹{Number(wo.approvedBudget || 0).toLocaleString('en-IN')})
                     </option>
                   ))}
               </select>
@@ -4020,24 +4121,9 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 If linked, the invoice cannot exceed the remaining Work Order budget. Selecting a WO auto-fills items, site and period.
               </small>
             </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-4" style={{ marginTop: '0.75rem' }}>
-              <div className="form-group">
-                <label className="form-label">Site</label>
-                <input
-                  className="form-input"
-                  value={client.site || ''}
-                  onChange={(e) => setClient({ ...client, site: e.target.value })}
-                  placeholder="Main Site / project site"
-                  list="inv-site-list"
-                />
-                <datalist id="inv-site-list">
-                  {(savedClients.find(c => c.name === client.name)?.sites || []).map(s => (
-                    <option key={s} value={s} />
-                  ))}
-                  <option value="Main Site" />
-                </datalist>
-              </div>
               <div className="form-group">
                 <label className="form-label">Bill period start</label>
                 <input type="date" className="form-input"
@@ -4199,7 +4285,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
               )}
             </div>
             
-            <div className="line-items-header sd-line-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 0.7fr 0.8fr 0.9fr 0.9fr 0.7fr auto', gap: 6, fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', padding: '0.35rem 0', borderBottom: '2px solid #e2e8f0', width: '100%' }}>
+            <div className="line-items-header sd-line-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 0.7fr 0.8fr 0.9fr 0.9fr 0.9fr 0.7fr auto', gap: 6, fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', padding: '0.35rem 0', borderBottom: '2px solid #e2e8f0', width: '100%' }}>
               <span>Description</span>
               <span>CostHead</span>
               <span>SAC</span>
@@ -4230,6 +4316,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 onSelectProduct={selectProduct}
                 onSetProductSearch={setProductSearch}
                 onAddCustomUnit={handleAddCustomUnit}
+                onAddCustomSac={handleAddCustomSac}
                 onRemoveCustomUnit={handleRemoveCustomUnit}
                 onRemove={removeItem}
                 clampNonNeg={clampNonNeg}

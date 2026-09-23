@@ -946,7 +946,9 @@ export default function PrintSettings() {
             </p>
             {[
               { key: 'tax-invoice',     label: 'Tax Invoice',       def: 'INV'  },
-              { key: 'proforma',        label: 'Proforma / Estimate', def: 'EST' },
+              { key: 'quotation',       label: 'Quotation',         def: 'QUO'  },
+              { key: 'proforma',        label: 'Proforma / Estimate', def: 'PI' },
+              { key: 'debit-note',      label: 'Debit Note',        def: 'DN'   },
               { key: 'bill-of-supply',  label: 'Bill of Supply',    def: 'BOS'  },
               { key: 'composition',     label: 'Composition',       def: 'COMP' },
               { key: 'credit-note',     label: 'Credit Note',       def: 'CN'   },

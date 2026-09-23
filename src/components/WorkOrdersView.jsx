@@ -7,6 +7,7 @@ import {
   deleteWorkOrder,
   getAllBills,
   getAllClients,
+  getAllCostCenters,
 } from '../store';
 import { calcWOUsage, emptyWOItem, calcItemAmount, deriveWOStatus } from '../utils/workOrder';
 import { formatCurrency } from '../utils';
@@ -17,6 +18,7 @@ export default function WorkOrdersView() {
   const [list, setList] = useState([]);
   const [bills, setBills] = useState([]);
   const [clients, setClients] = useState([]);
+  const [costCenters, setCostCenters] = useState([]);
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -30,7 +32,8 @@ export default function WorkOrdersView() {
       ]);
       setList(wos || []);
       setBills(bs || []);
-      setClients(cs || []);
+      setClients((cs || []).filter(c => !c.isVendor && c.type !== 'vendor'));
+      getAllCostCenters().then(setCostCenters).catch(() => {});
     } catch {
       toast('Failed to load Work Orders', 'error');
     } finally {

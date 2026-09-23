@@ -993,7 +993,7 @@ function App() {
         )}
         {currentView === 'new' && (
           <InvoiceGenerator
-            onBack={() => { setEditingBill(null); setCurrentView('dashboard'); }}
+            onBack={() => { setEditingBill(null); setCurrentView('invoices'); }}
             profile={profile} editingBill={editingBill}
           />
         )}

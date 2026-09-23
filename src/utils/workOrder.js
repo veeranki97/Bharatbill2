@@ -112,22 +112,24 @@ export function woItemsToInvoiceItems(woItems, allBills, wo) {
   });
 
   return (woItems || []).map((it, idx) => {
-    const key = (it.description || '').trim().toLowerCase();
+    const key = (it.description || it.name || '').trim().toLowerCase();
     const rem = remMap[key];
-    const qty = rem != null ? Math.min(Number(it.qty) || 0, rem) : (Number(it.qty) || 1);
+    const qty = rem != null ? Math.min(Number(it.qty) || Number(it.quantity) || 0, rem) : (Number(it.qty) || Number(it.quantity) || 1);
+    const rate = Number(it.rate) || 0;
+    const desc = it.description || it.name || '';
     return {
       id: 'item_' + Date.now().toString(36) + '_' + idx,
-      description: it.description || '',
-      hsn: it.hsn || '',
+      name: desc,
+      description: '',
+      hsn: it.hsn || it.sac || '',
       unit: it.unit || 'Nos',
-      qty: qty > 0 ? qty : 0,
-      rate: Number(it.rate) || 0,
-      amount: +(qty * (Number(it.rate) || 0)).toFixed(2),
+      quantity: qty > 0 ? qty : 0,
+      rate,
       discount: 0,
-      discountType: 'amount',
-      taxRate: 18,
-      cessRate: 0,
-      costHead: it.costHead || '',
+      discountType: 'fixed',
+      taxPercent: Number(it.taxPercent) || Number(it.taxRate) || 18,
+      cessPercent: 0,
+      costCenterId: it.costCenterId || it.costHead || '',
     };
-  }).filter(it => Number(it.qty) > 0);
+  }).filter(it => Number(it.quantity) > 0);
 }

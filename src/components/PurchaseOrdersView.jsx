@@ -147,11 +147,11 @@ export default function PurchaseOrdersView() {
     try {
       const [pos, clients, prof] = await Promise.all([
         getAllPurchaseOrders(),
-        getAllClients(),
+        getAllClients(), // filtered to vendors below
         getProfile().catch(() => null),
       ]);
       setList(pos || []);
-      setVendors(clients || []);
+      setVendors((clients || []).filter(c => c.isVendor || c.type === 'vendor'));
       setProfile(prof);
     } catch {
       toast('Failed to load Purchase Orders', 'error');
@@ -262,6 +262,7 @@ export default function PurchaseOrdersView() {
                   vendorName: name,
                   vendorGstin: v?.gstin || form.vendorGstin,
                   vendorState: v?.state || form.vendorState,
+                  site: v?.site || (Array.isArray(v?.sites) && v.sites[0]) || form.site || '',
                 });
               }} />
             <datalist id="po-vendors">{vendors.map(v => <option key={v.id || v.name} value={v.name} />)}</datalist>
@@ -279,18 +280,22 @@ export default function PurchaseOrdersView() {
           </div>
           <div className="form-group">
             <label className="form-label">Ship To (Site)</label>
-            <div className="form-group">
-              <label className="form-label">Cost Center *</label>
-              <select className="form-input" value={form.costCenterId || ''}
-                onChange={e => setForm({ ...form, costCenterId: e.target.value })}>
-                <option value="">Select cost center…</option>
-                {(costCenters || []).map(cc => (
-                  <option key={cc.id || cc.name} value={cc.id || cc.name}>{cc.name || cc.id}</option>
-                ))}
-              </select>
-            </div>
-            <input className="form-input" value={form.site || ''}
-              onChange={e => setForm({ ...form, site: e.target.value })} />
+            <input className="form-input" list="po-sites" value={form.site || ''}
+              onChange={e => setForm({ ...form, site: e.target.value })}
+              placeholder="Delivery site" />
+            <datalist id="po-sites">
+              {(form.site ? [form.site] : []).map(s => <option key={s} value={s} />)}
+            </datalist>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Cost Center *</label>
+            <select className="form-input" value={form.costCenterId || ''}
+              onChange={e => setForm({ ...form, costCenterId: e.target.value })}>
+              <option value="">Select cost center…</option>
+              {(costCenters || []).map(cc => (
+                <option key={cc.id || cc.name} value={cc.id || cc.name}>{cc.name || cc.id}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label className="form-label">GST %</label>

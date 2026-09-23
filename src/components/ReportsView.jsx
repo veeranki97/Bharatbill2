@@ -198,7 +198,12 @@ export default function ReportsView() {
         const bySite = {};
         allFilteredBills.forEach(b => {
           if (b.status === 'cancelled') return;
-          const site = b.site || b.data?.site || b.data?.details?.site || b.data?.client?.site || b.costCenterId || b.data?.costCenterId || 'Unassigned';
+          const site = (
+            b.site || b.data?.site || b.data?.details?.site || b.data?.client?.site
+            || (typeof b.data?.client === 'object' && b.data.client?.site)
+            || b.costCenterId || b.data?.costCenterId || b.data?.details?.costCenterId
+            || 'Unassigned'
+          );
           if (!bySite[site]) bySite[site] = { site, revenue: 0, tax: 0, count: 0 };
           const tot = Number(b.totalAmount) || 0;
           const tax = Number(b.data?.totals?.totalTax || b.data?.totals?.tax) || 0;
