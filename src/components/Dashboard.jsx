@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import DashboardCharts from './DashboardCharts';
 import { FileText, Trash2, Plus, IndianRupee, Receipt, Edit3, TrendingUp, Search, Copy, X, CheckCircle, Clock, AlertTriangle, MessageCircle, Mail, StickyNote, Send, Package, Download, Printer } from 'lucide-react';
 import HelpButton from './HelpButton';
-import { getAllBills, deleteBill, saveBill, getAllProducts, saveProduct, getProfile, getAllClients, getStockAlertSettings, saveReceipt, deleteReceipt, getAllReceipts } from '../store';
+import { getAllBills, deleteBill, saveBill, getAllProducts, saveProduct, getProfile, getAllClients, getStockAlertSettings, saveReceipt, deleteReceipt, getAllReceipts, saveJournal } from '../store';
+import { journalFromPayment } from '../utils/ledger';
 import { formatCurrency, INVOICE_TYPES, getFYOptions, numberToWords, belongsToProfile } from '../utils';
 import { openWhatsAppShare } from '../utils/share';
 import PageHeader from './PageHeader';
@@ -469,6 +470,42 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
       }
     }
     await saveBill(updated, { overwrite: true });
+    // Ledger + Cash Book: post receipt journal when marking paid/partial with new money
+    try {
+      if (newStatus === 'paid' || newStatus === 'partial') {
+        const already = (bill.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0);
+        const nowPaid = Number(updated.paidAmount) || 0;
+        const delta = Math.max(0, nowPaid - already);
+        // If we added a synthetic payment in updated.payments, use its amount
+        const lastPay = (updated.payments || []).slice(-1)[0];
+        const postAmt = (lastPay && !(bill.payments || []).some(p => p.id === lastPay.id))
+          ? Number(lastPay.amount) || delta
+          : delta;
+        if (postAmt > 0.005) {
+          const mode = lastPay?.mode || 'bank-transfer';
+          const jnl = journalFromPayment(updated, postAmt, mode, {
+            id: lastPay?.id || ('mk_' + Date.now()),
+            date: lastPay?.date || new Date().toISOString().split('T')[0],
+            party: bill.clientName,
+          });
+          if (jnl) await saveJournal(jnl);
+          await saveReceipt({
+            id: lastPay?.id || ('rcpt_' + Date.now()),
+            date: lastPay?.date || new Date().toISOString().split('T')[0],
+            receiptNo: `ADV-${String(Date.now()).slice(-6)}`,
+            clientName: bill.clientName || bill.data?.client?.name || '',
+            amount: postAmt,
+            paymentMode: mode,
+            againstInvoice: bill.invoiceNumber || bill.id,
+            note: lastPay?.note || 'Status change receipt',
+            currency: bill.currency || 'INR',
+            source: 'status-change',
+          }).catch(() => null);
+        }
+      }
+    } catch (e) {
+      console.warn('[ledger] status change journal failed', e);
+    }
     toast(`Marked as ${STATUS_CONFIG[newStatus].label}`, 'info');
     loadBills();
   };
@@ -531,6 +568,18 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
       });
     } catch { /* non-fatal — receipt is still viewable from the invoice's Payment History */ }
     toast(`Payment of ${formatCurrency(amount, bill.currency)} recorded`, 'success');
+    
+    // Double-entry + cash book: Bank/Cash Dr · Debtors Cr (party-tagged)
+    try {
+      const jnl = journalFromPayment(updatedBill, amount, paymentInput.mode, {
+        id: paymentEntry.id,
+        date: paymentEntry.date,
+        party: bill.clientName || bill.data?.client?.name,
+      });
+      if (jnl) await saveJournal(jnl);
+    } catch (e) {
+      console.warn('[ledger] payment journal failed', e);
+    }
     setPaymentModal(null);
     // v1.10.22 — reported: "Balance should be 1 but calculating zero" —
     // ₹649 invoice + ₹650 paid was hiding the ₹1 overpayment because the

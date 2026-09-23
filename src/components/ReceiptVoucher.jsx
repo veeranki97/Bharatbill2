@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Receipt, Plus, Trash2, Search, Printer, Pencil, Layers } from 'lucide-react';
-import { getAllReceipts, saveReceipt, deleteReceipt, getAllBills, getProfile, getNextInvoiceNumber, saveBill } from '../store';
+import { getAllReceipts, saveReceipt, deleteReceipt, getAllBills, getProfile, getNextInvoiceNumber, saveBill, saveJournal } from '../store';
+import { journalFromPayment } from '../utils/ledger';
 import { formatCurrency, numberToWords, belongsToProfile, isUnassignedToBusiness } from '../utils';
 import { planBulkAllocation } from '../utils/bulkPayment';
 import UnassignedBanner from './UnassignedBanner';
@@ -215,6 +216,15 @@ export default function ReceiptVoucher() {
             const newTotal = nextPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
             const nextStatus = newTotal >= (Number(bill.totalAmount) || 0) ? 'paid' : (newTotal > 0 ? 'partial' : 'unpaid');
             await saveBill({ ...bill, paidAmount: newTotal, status: nextStatus, payments: nextPayments }, { overwrite: true });
+            try {
+              const jnl = journalFromPayment(bill, paidAmount, form.paymentMode || form.mode || 'bank', {
+                id: form.id || ('rv_' + Date.now()),
+                date: form.date,
+                party: form.clientName || bill.clientName,
+              });
+              if (jnl) await saveJournal(jnl);
+            } catch (e) { console.warn('[ledger] receipt voucher journal', e); }
+
           }
         } catch { /* non-fatal: receipt is saved; user can manually update the bill */ }
       }
@@ -317,6 +327,15 @@ export default function ReceiptVoucher() {
         const newPaid = nextPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
         const nextStatus = newPaid >= (Number(bill.totalAmount) || 0) - 0.01 ? 'paid' : 'partial';
         await saveBill({ ...bill, paidAmount: newPaid, status: nextStatus, payments: nextPayments }, { overwrite: true });
+        try {
+          const jnl = journalFromPayment(bill, Number(form.amount)||0, form.paymentMode || 'bank', {
+            id: form.id || ('rv2_' + Date.now()),
+            date: form.date,
+            party: form.clientName || bill.clientName,
+          });
+          if (jnl) await saveJournal(jnl);
+        } catch (e) { console.warn('[ledger] receipt voucher journal', e); }
+
       }
       // Master receipt for audit
       try {

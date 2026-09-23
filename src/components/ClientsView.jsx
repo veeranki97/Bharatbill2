@@ -7,6 +7,7 @@ import { getPrintSettings } from '../utils/printSettings';
 import { openWhatsAppShare } from '../utils/share';
 import { confirmAction } from './ConfirmModal';
 import { toast } from './Toast';
+import ActionMenu from './ActionMenu';
 
 // v1.10.31 — UI-C3: Shared helper to resolve the user's accent color as an
 // RGB tuple usable with jsPDF setFillColor / setDrawColor. Falls back to the
@@ -941,14 +942,11 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                     )}
                     <div className="client-actions-bar" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', padding: '0.75rem 1.5rem', borderTop: '1px solid var(--border)' }}>
                       {savedClient ? (
-                        <>
-                          <button className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }} onClick={() => openEditClient(savedClient)}>
-                            <Edit3 size={13} /> Edit Client
-                          </button>
-                          <button className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', color: '#dc2626', borderColor: '#fecaca' }} onClick={() => handleDeleteClient(savedClient.id)}>
-                            <Trash2 size={13} /> Delete Client
-                          </button>
-                        </>
+                        <ActionMenu items={[
+                          { label: 'Edit Client', onClick: () => openEditClient(savedClient) },
+                          { label: 'Copy Client', onClick: () => openAddClient({ ...savedClient, id: undefined, name: (savedClient.name || clientName) + ' (Copy)' }) },
+                          { label: 'Delete Client', danger: true, onClick: () => handleDeleteClient(savedClient.id) },
+                        ]} />
                       ) : (
                         <button className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }} onClick={() => openAddClient({ name: clientName })}>
                           <Plus size={13} /> Save as Client

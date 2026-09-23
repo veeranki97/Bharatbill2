@@ -1,3 +1,4 @@
+import { downloadCsv } from '../utils/exportData';
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, ClipboardList } from 'lucide-react';
 import {
@@ -178,6 +179,12 @@ export default function WorkOrdersView() {
                     <td>
                       <ActionMenu items={[
                         { label: 'Edit', onClick: () => setForm({ ...wo, items: (wo.items && wo.items.length) ? wo.items : [emptyWOItem()] }) },
+                        { label: 'Copy', onClick: () => setForm({ ...wo, id: undefined, woNumber: '', items: (wo.items || []).map(it => ({ ...it })) }) },
+                        { label: 'Export row CSV', onClick: () => downloadRowsCsv(`WO-${wo.woNumber || wo.id}.csv`, [wo], [
+                          { key: 'woNumber', label: 'WO No' }, { key: 'clientName', label: 'Client' },
+                          { key: 'site', label: 'Site' }, { key: 'status', label: 'Status' },
+                          { key: 'total', label: 'Total', get: r => r.total || r.amount || '' },
+                        ]) },
                         { label: 'Delete', danger: true, onClick: () => remove(wo.id) },
                       ]} />
                     </td>

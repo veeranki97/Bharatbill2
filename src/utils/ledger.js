@@ -49,28 +49,37 @@ export function journalFromTaxInvoice(bill) {
   return {
     id: 'jnl_inv_' + (bill.id || bill.invoiceNumber),
     date: bill.invoiceDate || bill.data?.details?.invoiceDate,
-    narration: `Invoice ${bill.invoiceNumber}`,
+    narration: `Invoice ${bill.invoiceNumber} — ${bill.clientName || bill.data?.client?.name || ''}`,
     refType: 'invoice',
     refId: bill.id || bill.invoiceNumber,
+    party: bill.clientName || bill.data?.client?.name || '',
+    clientName: bill.clientName || bill.data?.client?.name || '',
     costCenterId: bill.costCenterId || bill.data?.costCenterId || null,
     site: bill.site || bill.data?.site || null,
     entries,
   };
 }
 
-export function journalFromPayment(bill, paymentAmount, mode = 'bank') {
+export function journalFromPayment(bill, paymentAmount, mode = 'bank', paymentMeta = {}) {
   const amt = Number(paymentAmount) || 0;
   if (amt <= 0) return null;
   const bankAcc = String(mode).toLowerCase().includes('cash') ? ACCOUNTS.CASH : ACCOUNTS.CASH_BANK;
+  const party = bill.data?.client?.name || bill.clientName || paymentMeta.party || '';
+  const payDate = paymentMeta.date || new Date().toISOString().split('T')[0];
+  const payId = paymentMeta.id || String(Date.now());
   return {
-    id: 'jnl_pay_' + (bill.id || bill.invoiceNumber) + '_' + Date.now(),
-    date: new Date().toISOString().split('T')[0],
-    narration: `Payment against ${bill.invoiceNumber}`,
+    id: 'jnl_pay_' + (bill.id || bill.invoiceNumber) + '_' + payId,
+    date: payDate,
+    narration: `Receipt from ${party || 'customer'} against ${bill.invoiceNumber || bill.id}`,
     refType: 'payment',
     refId: bill.id || bill.invoiceNumber,
+    party,
+    clientName: party,
+    site: bill.site || bill.data?.site || null,
+    costCenterId: bill.costCenterId || bill.data?.costCenterId || null,
     entries: [
-      { account: bankAcc, debit: amt, credit: 0 },
-      { account: ACCOUNTS.DEBTORS, debit: 0, credit: amt },
+      { account: bankAcc, debit: amt, credit: 0, party },
+      { account: ACCOUNTS.DEBTORS, debit: 0, credit: amt, party },
     ],
   };
 }

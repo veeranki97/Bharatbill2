@@ -72,6 +72,7 @@ export default function VendorsView() {
               <td>
                 <ActionMenu items={[
                   { label: 'Edit', onClick: () => setForm({ ...v }) },
+                  { label: 'Copy', onClick: () => setForm({ ...v, id: undefined, name: (v.name || '') + ' (Copy)' }) },
                   { label: 'Delete', danger: true, onClick: async () => {
                     if (!confirm('Delete vendor?')) return;
                     await deleteClient(v.id);

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { ArrowLeft, Plus, Trash2, Download, UserPlus, Pencil, Settings, ChevronUp, ChevronDown, MessageCircle, Check, Loader, Truck, Printer, Eye, EyeOff } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { saveBill, getNextInvoiceNumber, getTermsTemplates, getAllClients, saveClient, getProfile, getAllProducts, saveProduct, getInvoiceDisplayOptions, saveInvoiceDisplayOptions, getAllProfiles, getRegionMode, saveRecurring, getAllBills, getAllWorkOrders, saveJournal } from '../store';
+import { saveBill, getNextInvoiceNumber, getTermsTemplates, getAllClients, saveClient, getProfile, getAllProducts, saveProduct, getInvoiceDisplayOptions, saveInvoiceDisplayOptions, getAllProfiles, getRegionMode, saveRecurring, getAllBills, getAllWorkOrders, saveJournal, getAllCostCenters } from '../store';
 import { INVOICE_TYPES, generateEWayBillJSON, formatCurrency, getCountryConfig, getStatesForCountry, getAllUnits, addCustomUnit, removeCustomUnit, calculateRoundOff, getCountriesForRegion, TDS_SECTIONS, TCS_SECTIONS, TERMS_PRESETS, getActiveAccounts, getDefaultAccount, getAccountById, getDefaultUnitForMode, filterUnitsByMode, PAPER_SIZES, getPaperSize, computeInvoiceTotals, htmlHasText } from '../utils';
 // isValidIndianGSTIN used in save validation
 import { isValidIndianGSTIN as _isValidGSTIN } from '../utils';
@@ -272,7 +272,7 @@ function SuggestingInput({ item, suggestions, onFieldChange, onSelectProduct, on
 
 const LineItem = memo(function LineItem({
   item, invoiceOptions, taxInclusive, showGST, taxLabel,
-  units, countryTaxRates, filterUnitsByMode, invoiceMode,
+  units, countryTaxRates, filterUnitsByMode, invoiceMode, costCenters,
   currency, profileCountry, suggestions,
   onFieldChange, onSelectProduct, onSetProductSearch,
   onAddCustomUnit, onRemoveCustomUnit, onRemove, clampNonNeg,
@@ -316,7 +316,7 @@ const LineItem = memo(function LineItem({
       {invoiceOptions.showHSN && (
         <div className="line-item-field" style={{ flex: 1, position: 'relative' }}>
           <label className="form-label">HSN/SAC</label>
-          <input type="text" className="form-input" value={item.hsn}
+          <input type="text" className="form-input" value={item.hsn} list="sac-codes" placeholder="SAC/HSN"
             onChange={(e) => {
               const val = e.target.value;
               onFieldChange(item.id, 'hsn', val);
@@ -379,9 +379,13 @@ const LineItem = memo(function LineItem({
       </div>
         <div className="form-group" title="Cost center (not printed on PDF)">
           <label className="form-label" style={{ fontSize: '0.7rem' }}>Cost Center</label>
-          <input className="form-input" list="item-cost-centers" placeholder="Optional"
-            value={item.costCenterId || ''}
-            onChange={(e) => onFieldChange(item.id, 'costCenterId', e.target.value)} />
+          <select className="form-input" value={item.costCenterId || ''}
+            onChange={(e) => onFieldChange(item.id, 'costCenterId', e.target.value)}>
+            <option value="">— None —</option>
+            {(costCenters || []).map(cc => (
+              <option key={cc.id || cc.name} value={cc.id || cc.name}>{cc.name || cc.id}</option>
+            ))}
+          </select>
         </div>
       <div className="line-item-field" style={{ flex: 1.2 }}>
         <label className="form-label">Rate</label>
@@ -605,6 +609,11 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   const [internalNote, setInternalNote] = useState(draft?.internalNote || '');
   const [extraSections, setExtraSections] = useState(draft?.extraSections || []);
   const [savedClients, setSavedClients] = useState([]);
+  const [costCentersList, setCostCentersList] = useState([]);
+
+  useEffect(() => {
+    getAllCostCenters().then(list => setCostCentersList(Array.isArray(list) ? list : [])).catch(() => setCostCentersList([]));
+  }, []);
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   // v1.10.37 — Keyboard nav on client picker. Arrow keys cycle,
   // Enter commits, Escape closes. -1 = no highlight yet.
@@ -4094,6 +4103,19 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
           </div>
 
           {/* Line Items */}
+          <datalist id="sac-codes">
+            {[...new Set((products || []).map(p => p.hsn).filter(Boolean))].map(h => (
+              <option key={h} value={h} />
+            ))}
+            <option value="998311" /><option value="998312" /><option value="998313" />
+            <option value="998314" /><option value="998399" /><option value="998599" />
+            <option value="999799" /><option value="997212" />
+          </datalist>
+          <datalist id="unit-codes">
+            {(units || []).map(u => (
+              <option key={u.label || u} value={u.label || u} />
+            ))}
+          </datalist>
           <div className="glass-panel p-6 mb-6">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h3 className="section-title" style={{ margin: 0 }}>Line Items</h3>
@@ -4113,7 +4135,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 taxInclusive={taxInclusive}
                 showGST={showGST}
                 taxLabel={taxLabel}
-                units={units}
+                units={units} costCenters={costCentersList}
                 countryTaxRates={countryTaxRates}
                 filterUnitsByMode={filterUnitsByMode}
                 invoiceMode={invoiceOptions.invoiceMode}
