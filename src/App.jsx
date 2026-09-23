@@ -996,6 +996,9 @@ function App() {
         {currentView === 'generalledger' && (
           <GeneralLedgerView key={businessKey} />
         )}
+        {currentView === 'servicerev' && (
+          <Suspense fallback={<ViewLoading />}><ServiceRevenueReport key={businessKey} /></Suspense>
+        )}
         {currentView === 'finbooks' && (
           <Suspense fallback={<ViewLoading />}><FinancialBooksView key={businessKey} /></Suspense>
         )}

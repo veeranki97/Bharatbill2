@@ -1,25 +1,14 @@
 const KEY = 'fgsb_chart_prefs';
-const DEFAULTS = {
-  salesChart: 'bar', // bar | line | pie
-  agingChart: 'bar',
-  clientsChart: 'bar',
-  theme: 'blue', // blue | green | purple | slate
-};
-
+const DEFAULTS = { salesChart: 'line', agingChart: 'doughnut', clientsChart: 'bar', theme: 'blue' };
 export function getChartPrefs() {
-  try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
-  } catch {
-    return { ...DEFAULTS };
-  }
+  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; }
+  catch { return { ...DEFAULTS }; }
 }
-
 export function setChartPrefs(patch) {
   const next = { ...getChartPrefs(), ...patch };
   localStorage.setItem(KEY, JSON.stringify(next));
   return next;
 }
-
 export const THEME_COLORS = {
   blue: ['#3b82f6', '#1d4ed8', '#93c5fd'],
   green: ['#22c55e', '#15803d', '#86efac'],

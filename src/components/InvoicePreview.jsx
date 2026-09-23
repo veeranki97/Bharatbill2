@@ -933,10 +933,21 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
         <div className="sd-invoice" style={{ fontFamily: 'Helvetica, Arial, sans-serif', fontSize: '11px', color: '#111', border: '2px solid #111' }}>
           <div style={{ textAlign: 'center', borderBottom: '2px solid #111', padding: '10px 8px' }}>
             <div style={{ fontSize: '20px', fontWeight: 800, letterSpacing: 1 }}>{profile?.businessName || 'SAI DURGA'}</div>
-            <div style={{ fontSize: '13px', fontWeight: 700, marginTop: 4, textTransform: 'uppercase' }}>
-              {invoiceType === 'credit-note' || invoiceType === 'Credit Note' ? 'CREDIT NOTE'
-                : invoiceType === 'delivery-challan' || invoiceType === 'Delivery Challan' ? 'DELIVERY CHALLAN'
-                : invoiceType === 'proforma' ? 'PROFORMA INVOICE'
+            <div style={{
+              fontSize: (invoiceType === 'credit-note' || String(invoiceType).toLowerCase().includes('credit')) ? '16px' : '13px',
+              fontWeight: 800,
+              marginTop: 6,
+              textTransform: 'uppercase',
+              letterSpacing: (invoiceType === 'credit-note' || String(invoiceType).toLowerCase().includes('credit')) ? '0.12em' : '0.04em',
+              color: (invoiceType === 'credit-note' || String(invoiceType).toLowerCase().includes('credit')) ? '#b91c1c' : '#111',
+              border: (invoiceType === 'credit-note' || String(invoiceType).toLowerCase().includes('credit')) ? '2px solid #b91c1c' : 'none',
+              display: 'inline-block',
+              padding: (invoiceType === 'credit-note' || String(invoiceType).toLowerCase().includes('credit')) ? '4px 16px' : '0',
+              borderRadius: 2,
+            }}>
+              {invoiceType === 'credit-note' || invoiceType === 'Credit Note' || String(invoiceType).toLowerCase().includes('credit') ? 'CREDIT NOTE'
+                : invoiceType === 'delivery-challan' || invoiceType === 'Delivery Challan' || String(invoiceType).toLowerCase().includes('challan') ? 'DELIVERY CHALLAN'
+                : invoiceType === 'proforma' || String(invoiceType).toLowerCase().includes('proforma') ? 'PROFORMA INVOICE'
                 : 'TAX INVOICE'}
             </div>
           </div>
@@ -966,23 +977,35 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
                 </td>
               </tr>
               <tr>
-                <td style={{ borderRight: '1px solid #111', borderBottom: '1px solid #111', padding: 8, verticalAlign: 'top' }}>
-                  <strong>Billing To:</strong><br />
-                  <strong>{client?.name}</strong><br />
-                  {[client?.address, client?.city, client?.state, client?.pin].filter(Boolean).join(', ')}<br />
-                  {client?.gstin && <>GSTIN: {client.gstin}<br /></>}
-                  State: {client?.state || details?.placeOfSupply || '—'}
+                <td style={{ width: '50%', borderRight: '1px solid #111', borderBottom: '1px solid #111', padding: 0, verticalAlign: 'top' }}>
+                  <div style={{ background: '#f1f5f9', borderBottom: '1px solid #111', padding: '3px 8px', fontWeight: 700, fontSize: '10px', letterSpacing: '0.04em' }}>Billing To:</div>
+                  <div style={{ padding: '6px 8px', lineHeight: 1.45, minHeight: 72 }}>
+                    <strong style={{ fontSize: '11.5px' }}>{client?.name || '—'}</strong><br />
+                    {[client?.address, client?.city, client?.pin].filter(Boolean).join(', ')}
+                    {client?.state && <><br />State: {client.state}</>}
+                    {client?.gstin && <><br />GSTIN: {client.gstin}</>}
+                    {client?.phone && <><br />Mobile: {client.phone}</>}
+                  </div>
                 </td>
-                <td style={{ borderBottom: '1px solid #111', padding: 8, verticalAlign: 'top' }}>
-                  <strong>Shipping To:</strong><br />
-                  {details?.shipToSameAsBilling === false ? (
-                    <>
-                      {[details?.shippingAddress, details?.shippingCity, details?.shippingState, details?.shippingPin].filter(Boolean).join(', ') || client?.name}<br />
-                    </>
-                  ) : (
-                    <><strong>{client?.name}</strong><br />{[client?.address, client?.city].filter(Boolean).join(', ')}<br /></>
-                  )}
-                  Place of Supply: {details?.placeOfSupply || client?.state || '—'}
+                <td style={{ width: '50%', borderBottom: '1px solid #111', padding: 0, verticalAlign: 'top' }}>
+                  <div style={{ background: '#f1f5f9', borderBottom: '1px solid #111', padding: '3px 8px', fontWeight: 700, fontSize: '10px', letterSpacing: '0.04em' }}>Shipping To:</div>
+                  <div style={{ padding: '6px 8px', lineHeight: 1.45, minHeight: 72 }}>
+                    {details?.shipToSameAsBilling === false || details?.shippingName || details?.shippingAddress ? (
+                      <>
+                        <strong style={{ fontSize: '11.5px' }}>{details?.shippingName || client?.name || '—'}</strong><br />
+                        {[details?.shippingAddress, details?.shippingCity, details?.shippingPin].filter(Boolean).join(', ') || [client?.address, client?.city].filter(Boolean).join(', ')}
+                        {(details?.shippingState || client?.state) && <><br />State: {details?.shippingState || client?.state}</>}
+                        {details?.shippingGstin && <><br />GSTIN: {details.shippingGstin}</>}
+                      </>
+                    ) : (
+                      <>
+                        <strong style={{ fontSize: '11.5px' }}>{client?.name || '—'}</strong><br />
+                        {[client?.address, client?.city, client?.pin].filter(Boolean).join(', ')}
+                        {client?.state && <><br />State: {client.state}</>}
+                      </>
+                    )}
+                    <br /><span style={{ fontSize: '10px' }}><strong>Place of Supply:</strong> {details?.placeOfSupply || client?.state || '—'}</span>
+                  </div>
                 </td>
               </tr>
               {details?.workDetails && (

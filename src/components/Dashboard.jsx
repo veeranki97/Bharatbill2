@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
+import DashboardCharts from './DashboardCharts';
 import { FileText, Trash2, Plus, IndianRupee, Receipt, Edit3, TrendingUp, Search, Copy, X, CheckCircle, Clock, AlertTriangle, MessageCircle, Mail, StickyNote, Send, Package, Download, Printer } from 'lucide-react';
 import HelpButton from './HelpButton';
 import { getAllBills, deleteBill, saveBill, getAllProducts, saveProduct, getProfile, getAllClients, getStockAlertSettings, saveReceipt, deleteReceipt, getAllReceipts } from '../store';
 import { formatCurrency, INVOICE_TYPES, getFYOptions, numberToWords, belongsToProfile } from '../utils';
-import { getChartPrefs, THEME_COLORS } from '../utils/chartPrefs';
 import { openWhatsAppShare } from '../utils/share';
 import PageHeader from './PageHeader';
 import { toast } from './Toast';
@@ -183,8 +183,6 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
   // loadBills() from the raw server response, so Total Invoiced, Tax Collected,
   // Outstanding and the invoice count added up EVERY company's invoices while
   // the table underneath showed only one.
-  const chartPrefs = getChartPrefs();
-  const themeColors = THEME_COLORS[chartPrefs.theme] || THEME_COLORS.blue;
   const stats = useMemo(() => {
     const byCurrency = {};
     const byMonth = {};
@@ -1202,66 +1200,9 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
       </div>
 )}
       {/* KPI charts (home only) */}
-      {!listMode && stats.monthKeys?.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
-          <div className="glass-panel p-4">
-            <h3 style={{ margin: '0 0 12px', fontSize: 14 }}>Sales trend (6 months)</h3>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 120 }}>
-              {stats.monthKeys.map(m => {
-                const max = Math.max(...stats.monthKeys.map(k => stats.byMonth[k] || 0), 1);
-                const h = Math.round(((stats.byMonth[m] || 0) / max) * 100);
-                return (
-                  <div key={m} style={{ flex: 1, textAlign: 'center' }}>
-                    <div title={formatCurrency(stats.byMonth[m] || 0)} style={{
-                      height: Math.max(h, 4), background: `linear-gradient(180deg,${themeColors[0]},${themeColors[1]})`,
-                      borderRadius: '6px 6px 0 0', marginBottom: 4,
-                    }} />
-                    <div style={{ fontSize: 10, color: '#64748b' }}>{m.slice(5)}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="glass-panel p-4">
-            <h3 style={{ margin: '0 0 12px', fontSize: 14 }}>Outstanding aging</h3>
-            {[
-              ['Not due', stats.aging?.notDue, '#22c55e'],
-              ['0–30', stats.aging?.d0_30, '#3b82f6'],
-              ['31–60', stats.aging?.d31_60, '#f59e0b'],
-              ['61–90', stats.aging?.d61_90, '#f97316'],
-              ['90+', stats.aging?.d90p, '#ef4444'],
-            ].map(([label, val, color]) => (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
-                  {label}
-                </span>
-                <strong>{formatCurrency(val || 0)}</strong>
-              </div>
-            ))}
-          </div>
-          <div className="glass-panel p-4">
-            <h3 style={{ margin: '0 0 12px', fontSize: 14 }}>Top clients</h3>
-            {(stats.topClients || []).map(([name, amt]) => (
-              <div key={name} style={{ marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>{name}</span>
-                  <span>{formatCurrency(amt)}</span>
-                </div>
-                <div style={{ height: 4, background: '#e2e8f0', borderRadius: 2, marginTop: 2 }}>
-                  <div style={{
-                    height: 4, borderRadius: 2, background: '#8b5cf6',
-                    width: `${Math.round((amt / (stats.topClients[0][1] || 1)) * 100)}%`,
-                  }} />
-                </div>
-              </div>
-            ))}
-            {!(stats.topClients || []).length && <p style={{ color: '#94a3b8', fontSize: 13 }}>No data</p>}
-          </div>
-        </div>
+      {!listMode && (
+        <DashboardCharts stats={stats} />
       )}
-
-
 
       {/* Low Stock Alerts */}
       {lowStockProducts.length > 0 && (
