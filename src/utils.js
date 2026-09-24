@@ -32,8 +32,10 @@ export const GSTIN_STATE_MAP = {
   '10':'Bihar','11':'Sikkim','12':'Arunachal Pradesh','13':'Nagaland','14':'Manipur',
   '15':'Mizoram','16':'Tripura','17':'Meghalaya','18':'Assam','19':'West Bengal',
   '20':'Jharkhand','21':'Odisha','22':'Chhattisgarh','23':'Madhya Pradesh','24':'Gujarat',
-  '27':'Maharashtra','29':'Karnataka','30':'Goa','32':'Kerala','33':'Tamil Nadu',
-  '34':'Puducherry','36':'Telangana','37':'Andhra Pradesh','38':'Ladakh'
+  '25':'Daman and Diu','26':'Dadra and Nagar Haveli and Daman and Diu',
+  '27':'Maharashtra','29':'Karnataka','30':'Goa','31':'Lakshadweep','32':'Kerala','33':'Tamil Nadu',
+  '34':'Puducherry','35':'Andaman and Nicobar Islands','36':'Telangana','37':'Andhra Pradesh','38':'Ladakh',
+  '96':'Other Territory','97':'Other Territory','99':'Centre Jurisdiction'
 };
 
 export const numberToWords = (num) => {

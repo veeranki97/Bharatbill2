@@ -9,6 +9,7 @@ import { openWhatsAppShare } from '../utils/share';
 import PageHeader from './PageHeader';
 import { toast } from './Toast';
 import ActionMenu from './ActionMenu';
+import { runWorkflowRules } from './WorkflowRulesView';
 import { billsToSdCsv, downloadSdExport } from '../utils/sdExport';
 import { confirmAction } from './ConfirmModal';
 

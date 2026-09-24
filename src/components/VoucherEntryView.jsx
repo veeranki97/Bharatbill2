@@ -41,7 +41,7 @@ export default function VoucherEntryView() {
       let ref = '';
       try { ref = await getNextInvoiceNumber(type === 'receipt' ? 'REC' : type === 'payment' ? 'PAY' : 'JV'); } catch { ref = type.toUpperCase() + '/' + Date.now(); }
       await saveJournal({
-        id: 'jnl_' + Date.now().toString(36),
+        id: 'jnl_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 9))),
         date, narration: narration || `${type} voucher`,
         refType: type, refId: ref, party: party || null,
         entries,

@@ -117,7 +117,13 @@ export const setEnabledModules = (map) => {
 // longer burn counter values, so CA-audited businesses keep gapless sequences.
 export const getNextInvoiceNumber = async (prefix = 'INV', { peek = false, explicitPrefix = false } = {}) => {
   const settings = await getInvoiceNumberSettings();
-  const key = `counter_${prefix}`;
+  // When FY is shown in the number, scope the counter per financial year so
+  // sequence resets each April (matches user expectation of INV/26-27/0001).
+  let fyTag = '';
+  if (settings.showFinYear) {
+    fyTag = '_' + String(getFinancialYearLabel() || '').replace(/[^0-9A-Za-z-]/g, '');
+  }
+  const key = `counter_${prefix}${fyTag}`;
   let next;
   if (peek) {
     const { value: current } = await apiFetch(`${API}/meta/${key}`);
@@ -133,7 +139,15 @@ export const getNextInvoiceNumber = async (prefix = 'INV', { peek = false, expli
   // instead of the global brandPrefix from Invoice Number Settings.
   // Prior code always let brandPrefix win, so setting "Tax Invoice
   // prefix = RPT" was silently ignored because brandPrefix = 'DICECODES'.
-  const pfx = explicitPrefix ? prefix : (settings.brandPrefix || prefix);
+  // Type prefix is ALWAYS kept (INV/QUO/CN/…). Brand prefix may only PREFIX the type
+  // segment (e.g. SD-INV/26-27/0007), never replace it — avoids INV+QUO both printing as SD/…/0007.
+  const typePfx = prefix || 'INV';
+  const brand = (settings.brandPrefix || '').trim();
+  const pfx = explicitPrefix
+    ? typePfx
+    : (brand && brand.toUpperCase() !== typePfx.toUpperCase()
+        ? `${brand}-${typePfx}`
+        : typePfx);
 
   if (settings.format === 'random') {
     const rand = Math.random().toString(36).substring(2, 8).toUpperCase();

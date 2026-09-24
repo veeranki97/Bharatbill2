@@ -31,3 +31,34 @@ export default function WorkflowRulesView() {
     </div>
   );
 }
+
+
+/** Evaluate overdue rules against bills once per session; returns list of matches (does not auto-send). */
+export function runWorkflowRules(bills = []) {
+  const rules = (getWorkflowRules() || []).filter(r => r.enabled);
+  if (!rules.length) return [];
+  const today = new Date();
+  const hits = [];
+  (bills || []).forEach(b => {
+    const status = (b.status || '').toLowerCase();
+    if (status === 'paid' || status === 'cancelled' || status === 'received') return;
+    const due = b.data?.details?.dueDate || b.dueDate || b.invoiceDate;
+    if (!due) return;
+    const days = Math.floor((today - new Date(due)) / 86400000);
+    if (days < 0) return;
+    rules.forEach(r => {
+      if (days >= (Number(r.days) || 0)) {
+        hits.push({
+          billId: b.id,
+          invoiceNumber: b.invoiceNumber,
+          clientName: b.clientName,
+          daysOverdue: days,
+          channel: r.channel,
+          ruleId: r.id,
+          label: r.label,
+        });
+      }
+    });
+  });
+  return hits;
+}

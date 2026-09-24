@@ -7,6 +7,7 @@ import {
   getAllClients,
   getProfile,
   getAllCostCenters,
+  getNextInvoiceNumber,
 } from '../store';
 import { emptyWOItem, calcItemAmount } from '../utils/workOrder';
 import { formatCurrency } from '../utils';
@@ -28,18 +29,12 @@ function fyLabel(d = new Date()) {
   return m >= 3 ? `${String(y).slice(-2)}-${String(y + 1).slice(-2)}` : `${String(y - 1).slice(-2)}-${String(y).slice(-2)}`;
 }
 
-function nextPONumber(list) {
-  const fy = fyLabel();
-  const prefix = `PO/${fy}/`;
-  let max = 0;
-  (list || []).forEach(p => {
-    const s = String(p.poNumber || '');
-    if (s.startsWith(prefix)) {
-      const n = parseInt(s.slice(prefix.length), 10);
-      if (!isNaN(n)) max = Math.max(max, n);
-    }
-  });
-  return `${prefix}${String(max + 1).padStart(3, '0')}`;
+async function nextPONumber() {
+  try {
+    return await getNextInvoiceNumber('PO', { explicitPrefix: true });
+  } catch {
+    return 'PO/0001';
+  }
 }
 
 /** GST split like SD Dynamics: same state → CGST+SGST else IGST */
@@ -199,7 +194,7 @@ export default function PurchaseOrdersView() {
   const save = async () => {
     if (!form.vendorName?.trim()) return toast('Vendor required', 'error');
     if (!(form.costCenterId || '').trim()) return toast('Cost Center is required', 'error');
-    if (!form.poNumber?.trim()) form.poNumber = nextPONumber(list);
+    if (!form.poNumber?.trim()) form.poNumber = await nextPONumber();
     const items = (form.items || []).map(it => ({ ...it, amount: calcItemAmount(it) }));
     const totals = calcPOTotals(items, form.taxRate, form.vendorState, profile?.state);
     const payload = {

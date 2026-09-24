@@ -1832,6 +1832,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
         }
       } catch (jErr) {
         console.warn('Journal post skipped:', jErr);
+        try { toast('Invoice saved, but ledger journal failed — check Books → Journals', 'warning'); } catch { /* toast optional */ }
       }
       // v1.10.24 — Follow-up: write the `credit-transferred-out` entries
       // to each source overpaid bill. Sequential so a failure on any one

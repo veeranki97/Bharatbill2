@@ -286,14 +286,56 @@ app.delete('/api/bills/:id', (req, res) => {
       });
     }
   }
+  // Always reverse/trash the matching invoice journal so GL stays consistent
+  const trashInvoiceJournal = (billId, permanent) => {
+    try {
+      const jDir = path.join(DATA_DIR, 'journals');
+      if (!fs.existsSync(jDir)) return;
+      const candidates = [
+        'jnl_inv_' + safeFileName(billId) + '.json',
+        'jnl_inv_' + String(billId).replace(/[^a-zA-Z0-9._-]/g, '_') + '.json',
+      ];
+      // Also scan for refId match
+      let files = candidates.filter(f => fs.existsSync(path.join(jDir, f)));
+      if (!files.length) {
+        try {
+          for (const f of fs.readdirSync(jDir)) {
+            if (!f.startsWith('jnl_inv_') || !f.endsWith('.json')) continue;
+            try {
+              const j = JSON.parse(fs.readFileSync(path.join(jDir, f), 'utf8'));
+              if (j.refId === billId || j.refId === req.params.id) files.push(f);
+            } catch { /* skip */ }
+          }
+        } catch { /* skip */ }
+      }
+      const jTrash = path.join(DATA_DIR, 'trash', 'journals');
+      for (const f of files) {
+        const src = path.join(jDir, f);
+        if (!fs.existsSync(src)) continue;
+        if (permanent) {
+          try { fs.unlinkSync(src); } catch { /* ignore */ }
+        } else {
+          if (!fs.existsSync(jTrash)) fs.mkdirSync(jTrash, { recursive: true });
+          try { fs.renameSync(src, path.join(jTrash, f)); } catch {
+            try { fs.unlinkSync(src); } catch { /* ignore */ }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('trashInvoiceJournal', e.message);
+    }
+  };
+
   if (req.query.permanent === '1') {
     try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+    trashInvoiceJournal(req.params.id, true);
     return res.json({ success: true, permanent: true });
   }
   try {
     const trashDir = path.join(DATA_DIR, 'trash');
     if (!fs.existsSync(trashDir)) fs.mkdirSync(trashDir, { recursive: true });
     fs.renameSync(filePath, path.join(trashDir, fname));
+    trashInvoiceJournal(req.params.id, false);
     res.json({ success: true, trashed: true });
   } catch (err) {
     errRes(res, 500, 'server-error', err);
@@ -549,7 +591,16 @@ app.post('/api/journals', (req, res) => {
     if (!j?.id) return res.status(400).json({ error: 'Missing id' });
     const dir = path.join(DATA_DIR, 'journals');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    writeJSON(path.join(dir, safeFileName(j.id) + '.json'), j);
+    const dest = path.join(dir, safeFileName(j.id) + '.json');
+    const overwrite = req.query.overwrite === '1' || req.query.overwrite === 'true' || j.overwrite === true;
+    if (fs.existsSync(dest) && !overwrite) {
+      return res.status(409).json({
+        error: 'journal-exists',
+        message: 'A journal with this id already exists. Pass overwrite=1 to replace.',
+        id: j.id,
+      });
+    }
+    writeJSON(dest, j);
     res.json({ success: true, id: j.id });
   } catch (e) {
     res.status(500).json({ error: e.message });
