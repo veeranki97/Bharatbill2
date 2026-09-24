@@ -85,7 +85,7 @@ export default function ReceiptVoucher() {
   // which raced under concurrent saves + two tabs.
   const getNextReceiptNo = async () => {
     try {
-      return await getNextInvoiceNumber('ADV', { peek: true });
+      return await getNextInvoiceNumber('REC', { peek: true, explicitPrefix: true });
     } catch {
       // Fallback preserves old behaviour if server is offline mid-mount
       const count = receipts.length + 1;
@@ -157,7 +157,7 @@ export default function ReceiptVoucher() {
       let receiptNo = form.receiptNo;
       if (!editingId) {
         try {
-          receiptNo = await getNextInvoiceNumber('ADV');
+          receiptNo = await getNextInvoiceNumber('REC', { explicitPrefix: true });
         } catch { /* fall back to peeked number */ }
       }
 
@@ -356,7 +356,7 @@ export default function ReceiptVoucher() {
       }
       // Master receipt for audit
       try {
-        const receiptNo = await getNextInvoiceNumber('ADV');
+        const receiptNo = await getNextInvoiceNumber('REC', { explicitPrefix: true });
         await saveReceipt({
           date: today,
           receiptNo,
@@ -480,9 +480,9 @@ export default function ReceiptVoucher() {
                       onChange={() => {
                       updateField('paymentType', t);
                       if (t === 'advance' || t === 'vendor') {
-                        getNextInvoiceNumber('ADV', { peek: true }).then(num => {
+                        getNextInvoiceNumber('REC', { peek: true, explicitPrefix: true }).then(num => {
                           const n = String(num || '');
-                          updateField('receiptNo', n.startsWith('ADV') ? n : ('ADV-' + n.replace(/^ADV[-/]?/i,'')));
+                          updateField('receiptNo', n.startsWith('REC') || n.startsWith('ADV') ? n : ('REC/' + n.replace(/^REC[-/]?/i,'').replace(/^ADV[-/]?/i,'')));
                         }).catch(() => {});
                       }
                     }} /> {t === 'invoice' ? 'Against invoice' : t}

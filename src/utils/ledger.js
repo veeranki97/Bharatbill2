@@ -130,17 +130,43 @@ export function journalFromPayment(bill, paymentAmount, mode = 'bank', paymentMe
   return {
     id: 'jnl_pay_' + (bill.id || bill.invoiceNumber) + '_' + payId,
     date: payDate,
-    narration: `Receipt from ${party || 'customer'} against ${bill.invoiceNumber || bill.id}`,
+    narration: `Receipt against ${bill.invoiceNumber || bill.id || ''} — ${party || 'customer'}`,
     refType: 'payment',
     refId: bill.id || bill.invoiceNumber,
     party,
     clientName: party,
+    againstInvoice: bill.invoiceNumber || bill.id || '',
+    invoiceNumber: bill.invoiceNumber || '',
     site: bill.site || bill.data?.site || null,
     costCenterId: bill.costCenterId || bill.data?.costCenterId || null,
     entries: [
       { account: bankAcc, debit: amt, credit: 0, party },
       { account: ACCOUNTS.DEBTORS, debit: 0, credit: amt, party },
     ],
+  };
+}
+
+
+/** Reversing entry for a prior payment journal (unpaid / void receipt). */
+export function journalReversePayment(originalJournal, reason = 'Payment reversed') {
+  if (!originalJournal?.entries?.length) return null;
+  return {
+    id: 'jnl_rev_' + (originalJournal.id || Date.now()),
+    date: new Date().toISOString().split('T')[0],
+    narration: reason + (originalJournal.narration ? ` — was: ${originalJournal.narration}` : ''),
+    refType: 'payment-reversal',
+    refId: originalJournal.refId || originalJournal.id,
+    party: originalJournal.party || originalJournal.clientName || '',
+    clientName: originalJournal.clientName || originalJournal.party || '',
+    site: originalJournal.site || null,
+    costCenterId: originalJournal.costCenterId || null,
+    reversesId: originalJournal.id,
+    entries: (originalJournal.entries || []).map(e => ({
+      account: e.account,
+      debit: Number(e.credit) || 0,
+      credit: Number(e.debit) || 0,
+      party: e.party,
+    })),
   };
 }
 

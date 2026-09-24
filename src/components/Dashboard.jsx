@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import DashboardCharts from './DashboardCharts';
 import { FileText, Trash2, Plus, IndianRupee, Receipt, Edit3, TrendingUp, Search, Copy, X, CheckCircle, Clock, AlertTriangle, MessageCircle, Mail, StickyNote, Send, Package, Download, Printer } from 'lucide-react';
 import HelpButton from './HelpButton';
-import { getAllBills, deleteBill, saveBill, getAllProducts, saveProduct, getProfile, getAllClients, getStockAlertSettings, saveReceipt, deleteReceipt, getAllReceipts, saveJournal } from '../store';
-import { journalFromPayment } from '../utils/ledger';
+import { getAllBills, deleteBill, saveBill, getAllProducts, saveProduct, getProfile, getAllClients, getStockAlertSettings, saveReceipt, deleteReceipt, getAllReceipts, saveJournal, getAllJournals, getNextInvoiceNumber } from '../store';
+import { journalFromPayment, journalReversePayment } from '../utils/ledger';
 import { formatCurrency, INVOICE_TYPES, getFYOptions, numberToWords, belongsToProfile } from '../utils';
 import { openWhatsAppShare } from '../utils/share';
 import PageHeader from './PageHeader';
@@ -11,7 +11,7 @@ import { toast } from './Toast';
 import ActionMenu from './ActionMenu';
 import { runWorkflowRules } from './WorkflowRulesView';
 import { billsToSdCsv, downloadSdExport } from '../utils/sdExport';
-import { confirmAction } from './ConfirmModal';
+import { confirmAction, promptAction } from './ConfirmModal';
 
 // v1.10.13 — `bg` values switched from opaque tints (#fffbeb / #f5f3ff /
 // etc.) to translucent alpha versions of the accent color. Reason:
@@ -45,7 +45,7 @@ function ReceiptModal({ target, onClose }) {
   const clientName = bill.data?.client?.name || bill.clientName || 'Client';
   const clientAddress = bill.data?.client?.address || '';
   const clientPhone = bill.data?.client?.phone || '';
-  const receiptNo = `RCPT-${(payment.id || '').replace('pay_', '').toUpperCase().slice(0, 10)}`;
+  const receiptNo = payment.receiptNo || payment.againstInvoice || bill.invoiceNumber || `REC-${String(payment.id || '').replace('pay_', '').slice(-8).toUpperCase()}`;
   const paymentModeLabel = {
     'bank-transfer': 'Bank Transfer', 'upi': 'UPI', 'cash': 'Cash',
     'cheque': 'Cheque', 'card': 'Card', 'other': 'Other',
@@ -451,63 +451,111 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
   };
 
   const changeStatus = async (bill, newStatus) => {
-    const updated = { ...bill, status: newStatus };
-    if (newStatus === 'paid') {
-      updated.paidAmount = bill.totalAmount;
-      // When flipping to paid via the row menu, also push a synthetic payment
-      // so the payment-history modal and ReportsView cashflow both reflect
-      // it. Without this, "Mark as Paid" left `payments: []` and the two
-      // reports disagreed with the bill's status.
-      const already = (bill.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0);
-      const outstanding = Math.max(0, Number(bill.totalAmount) - already);
-      if (outstanding > 0) {
-        updated.payments = [...(bill.payments || []), {
-          amount: outstanding,
-          date: new Date().toISOString().split('T')[0],
-          mode: 'other',
-          note: 'Marked paid',
-          recordedAt: new Date().toISOString(),
-        }];
-      }
-    }
-    await saveBill(updated, { overwrite: true });
-    // Ledger + Cash Book: post receipt journal when marking paid/partial with new money
-    try {
-      if (newStatus === 'paid' || newStatus === 'partial') {
-        const already = (bill.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0);
-        const nowPaid = Number(updated.paidAmount) || 0;
-        const delta = Math.max(0, nowPaid - already);
-        // If we added a synthetic payment in updated.payments, use its amount
-        const lastPay = (updated.payments || []).slice(-1)[0];
-        const postAmt = (lastPay && !(bill.payments || []).some(p => p.id === lastPay.id))
-          ? Number(lastPay.amount) || delta
-          : delta;
-        if (postAmt > 0.005) {
-          const mode = lastPay?.mode || 'bank-transfer';
-          const jnl = journalFromPayment(updated, postAmt, mode, {
-            id: lastPay?.id || ('mk_' + Date.now()),
-            date: lastPay?.date || new Date().toISOString().split('T')[0],
-            party: bill.clientName,
+    const alreadyPaid = (bill.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+      || Number(bill.paidAmount) || 0;
+    const billTotal = Number(bill.totalAmount) || 0;
+    const outstanding = Math.max(0, billTotal - alreadyPaid);
+    const today = new Date().toISOString().split('T')[0];
+    let updated = { ...bill, status: newStatus };
+
+    // Paid / Partial — formal payment + journal + sequential REC (never status-only for partial)
+    if (newStatus === 'paid' || newStatus === 'partial') {
+      let postAmt = 0;
+      if (newStatus === 'paid') {
+        postAmt = outstanding;
+        updated.paidAmount = billTotal;
+      } else {
+        let raw = null;
+        try {
+          raw = await promptAction({
+            title: 'Partial payment amount',
+            message: `Outstanding: ${formatCurrency(outstanding, bill.currency || 'INR')}. Enter amount received.`,
+            placeholder: String(outstanding || ''),
+            confirmLabel: 'Record payment',
           });
-          if (jnl) await saveJournal(jnl);
-          await saveReceipt({
-            id: lastPay?.id || ('rcpt_' + Date.now()),
-            date: lastPay?.date || new Date().toISOString().split('T')[0],
-            receiptNo: `ADV-${String(Date.now()).slice(-6)}`,
-            clientName: bill.clientName || bill.data?.client?.name || '',
-            amount: postAmt,
-            paymentMode: mode,
-            againstInvoice: bill.invoiceNumber || bill.id,
-            note: lastPay?.note || 'Status change receipt',
-            currency: bill.currency || 'INR',
-            source: 'status-change',
-          }).catch(() => null);
+        } catch { raw = null; }
+        postAmt = parseFloat(raw);
+        if (!isFinite(postAmt) || postAmt <= 0) {
+          toast('Partial payment cancelled — amount required for ledger', 'warning');
+          return;
         }
+        updated.paidAmount = Math.min(billTotal, alreadyPaid + postAmt);
+        updated.status = (updated.paidAmount + 0.01 >= billTotal) ? 'paid' : 'partial';
       }
-    } catch (e) {
-      console.warn('[ledger] status change journal failed', e);
+      if (postAmt > 0.005) {
+        let receiptNo = '';
+        try { receiptNo = await getNextInvoiceNumber('REC', { explicitPrefix: true }); }
+        catch { receiptNo = 'REC/' + String(Date.now()).slice(-6); }
+        const payId = 'pay_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const paymentEntry = {
+          id: payId,
+          amount: postAmt,
+          date: today,
+          mode: 'bank-transfer',
+          note: newStatus === 'paid' ? 'Marked paid' : 'Partial payment',
+          recordedAt: new Date().toISOString(),
+          receiptNo,
+          againstInvoice: bill.invoiceNumber || bill.id,
+        };
+        updated.payments = [...(bill.payments || []), paymentEntry];
+        await saveBill(updated, { overwrite: true });
+        try {
+          const jnl = journalFromPayment(updated, postAmt, paymentEntry.mode, {
+            id: payId, date: today, party: bill.clientName || bill.data?.client?.name,
+          });
+          if (jnl) {
+            jnl.againstInvoice = bill.invoiceNumber || bill.id;
+            jnl.receiptNo = receiptNo;
+            await saveJournal(jnl);
+          }
+          await saveReceipt({
+            id: payId, date: today, receiptNo,
+            clientName: bill.clientName || bill.data?.client?.name || '',
+            amount: postAmt, paymentMode: paymentEntry.mode,
+            againstInvoice: bill.invoiceNumber || bill.id,
+            note: paymentEntry.note, currency: bill.currency || 'INR',
+            source: 'status-change', billId: bill.id,
+          }).catch(() => null);
+        } catch (e) {
+          console.warn('[ledger] status change journal failed', e);
+          toast('Status saved but ledger post failed', 'warning');
+        }
+      } else {
+        await saveBill(updated, { overwrite: true });
+      }
+    } else if (newStatus === 'unpaid' || newStatus === 'pending') {
+      const proceed = await confirmAction({
+        title: 'Mark unpaid and reverse payments?',
+        message: 'Reverses ledger and cash-book entries for receipts on this invoice.',
+        confirmLabel: 'Reverse & mark unpaid',
+        tone: 'warning',
+      }).catch(() => false);
+      if (!proceed) return;
+      updated.paidAmount = 0;
+      updated.payments = [];
+      updated.status = 'unpaid';
+      await saveBill(updated, { overwrite: true });
+      try {
+        const journals = await getAllJournals().catch(() => []);
+        const related = (journals || []).filter(j =>
+          j.refType === 'payment' && (
+            j.refId === bill.id || j.refId === bill.invoiceNumber
+            || j.againstInvoice === bill.invoiceNumber
+            || j.invoiceNumber === bill.invoiceNumber
+          )
+        );
+        for (const j of related) {
+          if ((journals || []).some(x => x.reversesId === j.id)) continue;
+          const rev = journalReversePayment(j, `Unpaid — reverse ${bill.invoiceNumber || bill.id}`);
+          if (rev) await saveJournal(rev);
+        }
+      } catch (e) {
+        console.warn('[ledger] unpaid reversal failed', e);
+      }
+    } else {
+      await saveBill(updated, { overwrite: true });
     }
-    toast(`Marked as ${STATUS_CONFIG[newStatus].label}`, 'info');
+    toast(`Marked as ${STATUS_CONFIG[updated.status]?.label || updated.status}`, 'info');
     loadBills();
   };
 
@@ -534,10 +582,15 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
       });
       if (!proceed) return;
     }
+    let receiptNoSeq = '';
+    try { receiptNoSeq = await getNextInvoiceNumber('REC', { explicitPrefix: true }); }
+    catch { receiptNoSeq = 'REC/' + String(Date.now()).slice(-6); }
     const paymentEntry = {
       id: 'pay_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       amount, date: paymentInput.date, mode: paymentInput.mode,
       note: paymentInput.note, recordedAt: new Date().toISOString(),
+      receiptNo: receiptNoSeq,
+      againstInvoice: bill.invoiceNumber || bill.id,
     };
     const payments = [...(bill.payments || []), paymentEntry];
     const totalPaid = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
@@ -555,7 +608,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
       await saveReceipt({
         id: paymentEntry.id,
         date: paymentEntry.date,
-        receiptNo: `RCPT-${paymentEntry.id.replace('pay_', '').toUpperCase().slice(0, 10)}`,
+        receiptNo: paymentEntry.receiptNo,
         clientName: bill.data?.client?.name || bill.clientName || '',
         clientAddress: bill.data?.client?.address || '',
         amount: paymentEntry.amount,
@@ -577,7 +630,11 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
         date: paymentEntry.date,
         party: bill.clientName || bill.data?.client?.name,
       });
-      if (jnl) await saveJournal(jnl);
+      if (jnl) {
+        jnl.againstInvoice = bill.invoiceNumber || bill.id;
+        jnl.receiptNo = paymentEntry.receiptNo;
+        await saveJournal(jnl);
+      }
     } catch (e) {
       console.warn('[ledger] payment journal failed', e);
     }
@@ -684,7 +741,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
       await saveReceipt({
         id: withId,
         date: form.date,
-        receiptNo: `RCPT-${withId.replace('pay_', '').toUpperCase().slice(0, 10)}`,
+        receiptNo: payment.receiptNo || `REC/${String(withId).slice(-6)}`,
         clientName: bill.data?.client?.name || bill.clientName || '',
         clientAddress: bill.data?.client?.address || '',
         amount: newAmount,
