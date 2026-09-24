@@ -55,10 +55,10 @@ export default function CashBookView() {
   }, []);
 
   const rows = useMemo(() => {
+    // Single source of truth: Journal only (same as General Ledger).
+    // Receipts/expenses without a journal no longer appear here — prevents
+    // "cash book shows payment, ledger does not" drift.
     const entries = [];
-    const seen = new Set(); // de-dupe receipt vs journal same payment
-
-    // 1) Journal is source of truth for Bank/Cash movements
     (journals || []).forEach(j => {
       (j.entries || []).forEach(e => {
         const acc = (e.account || '').toLowerCase();
@@ -66,72 +66,31 @@ export default function CashBookView() {
         const dr = Number(e.debit) || 0;
         const cr = Number(e.credit) || 0;
         if (dr < 0.005 && cr < 0.005) return;
-        const key = (j.id || '') + '|' + acc + '|' + dr + '|' + cr;
-        if (seen.has(key)) return;
-        seen.add(key);
-        const invRef = j.againstInvoice || j.invoiceNumber || j.receiptNo || j.refId || '';
+        const invRef = j.againstInvoice || j.invoiceNumber || j.receiptNo
+          || (j.refType === 'expense' ? (j.narration || '') : '')
+          || j.refId || '';
         entries.push({
           date: j.date,
           type: j.refType === 'payment-reversal' ? 'Reversal'
-            : (j.refType === 'payment' ? 'Receipt' : (dr > 0 ? 'Inflow' : 'Outflow')),
-          ref: invRef || j.narration || j.id || '',
+            : j.refType === 'payment' ? 'Receipt'
+            : j.refType === 'expense' ? 'Expense'
+            : (dr > 0 ? 'Inflow' : 'Outflow'),
+          ref: invRef || j.narration || '',
           name: j.party || j.clientName || e.party || '',
           inflow: dr > 0 ? dr : 0,
           outflow: cr > 0 ? cr : 0,
-          _fromJournal: true,
         });
       });
     });
-
-    // 2) Receipts not already covered by a journal (legacy)
-    receipts.forEach(r => {
-      const amt = Number(r.amount) || 0;
-      const inv = r.againstInvoice || '';
-      const key = inv + '|' + amt + '|' + (r.date || '');
-      if ([...seen].some(s => s.includes(String(amt)))) {
-        // soft skip if matching journal amount same day
-      }
-      const already = entries.some(en =>
-        en._fromJournal && Math.abs((en.inflow || 0) - amt) < 0.02 && en.date === r.date
-        && (en.ref === inv || en.ref === r.receiptNo || en.name === r.clientName)
-      );
-      if (already) return;
-      entries.push({
-        date: r.date,
-        type: 'Receipt',
-        ref: inv || r.receiptNo || '',
-        name: r.clientName,
-        inflow: amt > 0 ? amt : 0,
-        outflow: amt < 0 ? Math.abs(amt) : 0,
-      });
-    });
-
-    expenses.forEach(ex => {
-      const amt = Math.abs(Number(ex.amount) || 0);
-      const already = entries.some(en =>
-        en._fromJournal && Math.abs((en.outflow || 0) - amt) < 0.02 && en.date === ex.date
-      );
-      if (already) return;
-      entries.push({
-        date: ex.date,
-        type: 'Expense',
-        ref: ex.category || '',
-        name: ex.description || ex.vendor || '',
-        inflow: 0,
-        outflow: amt,
-      });
-    });
-
     entries.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
     let bal = Number(ob) || 0;
     return entries
       .filter(e => !obDate || !e.date || e.date >= obDate)
       .map(e => {
         bal = bal + e.inflow - e.outflow;
-        const { _fromJournal, ...rest } = e;
-        return { ...rest, balance: bal };
+        return { ...e, balance: bal };
       });
-  }, [receipts, expenses, journals, ob, obDate]);
+  }, [journals, ob, obDate]);
 
   const saveOb = () => {
     localStorage.setItem('freegstbill_cashbook_ob', String(ob));
@@ -148,7 +107,7 @@ export default function CashBookView() {
           <Banknote size={22} /> Cash Book
         </h2>
         <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportCashCsv(rows)}>Export CSV</button>
-        <p className="page-subtitle">Running balance from receipts & expenses</p>
+        <p className="page-subtitle">Running balance from Journal (Bank/Cash) — same source as General Ledger</p>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>

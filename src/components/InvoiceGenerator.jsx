@@ -358,7 +358,7 @@ const LineItem = memo(function LineItem({
               confirm the code is right. Hidden until at least 4 chars. */}
           {(() => {
             const s = suggestGstRate(item.hsn);
-            if (!s || !item.hsn || String(item.hsn).length < 4) return null;
+            if (!s || !item.hsn || item.hsn && !/^\d{2}$|^\d{4}$|^\d{6}$|^\d{8}$/.test(String(item.hsn).trim())) return null;
             return (
               <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 2, padding: '3px 6px', fontSize: '0.68rem', color: '#059669', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', zIndex: 1 }}
                 title={`${s.label} — suggested ${s.rate}% GST`}>
@@ -1761,6 +1761,16 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
         }
       }
     } catch { /* ignore */ }
+    
+    // HSN/SAC: exact 2/4/6/8 digits when provided
+    for (const it of items) {
+      const h = String(it.hsn || '').trim();
+      if (h && !/^\d{2}$|^\d{4}$|^\d{6}$|^\d{8}$/.test(h)) {
+        toast(`HSN/SAC "${h}" must be 2, 4, 6 or 8 digits`, 'error');
+        return;
+      }
+    }
+
     if (details.periodStart && details.periodEnd) {
 
       if (new Date(details.periodStart) > new Date(details.periodEnd)) {
@@ -1832,7 +1842,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
         }
       } catch (jErr) {
         console.warn('Journal post skipped:', jErr);
-        try { toast('Invoice saved, but ledger journal failed — check Books → Journals', 'warning'); } catch { /* toast optional */ }
+        try { toast('Invoice saved, but ledger journal failed — open Books → Journals and post manually if needed', 'warning'); } catch { /* */ }
       }
       // v1.10.24 — Follow-up: write the `credit-transferred-out` entries
       // to each source overpaid bill. Sequential so a failure on any one
