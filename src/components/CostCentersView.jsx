@@ -1,3 +1,5 @@
+import { suggestGstRate } from '../utils/hsnRates';
+import { getHsnMaster, addHsnCode, removeHsnCode, getUnitMaster, addUnit, removeUnit, getExpenseCategories, addExpenseCategory, removeExpenseCategory } from '../utils/masterData';
 import { useState, useEffect } from 'react';
 import { getAllCostCenters, saveCostCenter, deleteCostCenter } from '../store';
 import { toast } from './Toast';
@@ -33,12 +35,9 @@ export default function CostCentersView() {
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState('');
   const [editing, setEditing] = useState(null);
-  const [hsnList, setHsnList] = useState(() => loadJson(SAC_KEY));
-  const [unitList, setUnitList] = useState(() => {
-    const u = loadJson(UNIT_KEY);
-    return u.length ? u : ['Nos', 'Hrs', 'Days', 'Kg', 'Ltr', 'Mtr', 'Sqft', 'Job'];
-  });
-  const [expList, setExpList] = useState(() => loadJson(EXP_KEY));
+  const [hsnList, setHsnList] = useState(() => getHsnMaster());
+  const [unitList, setUnitList] = useState(() => getUnitMaster());
+  const [expList, setExpList] = useState(() => getExpenseCategories());
 
   const load = () => getAllCostCenters().then(setList).catch(() => toast('Failed to load cost centres', 'error'));
   useEffect(() => { load(); }, []);
@@ -89,18 +88,14 @@ export default function CostCentersView() {
       return;
     }
     if (hsnList.includes(t)) { toast('Already in list', 'info'); return; }
-    const next = [...hsnList, t];
-    setHsnList(next);
-    saveJson(SAC_KEY, next);
+    setHsnList(addHsnCode(t));
     toast(`HSN/SAC ${t} saved — available on Invoice, WO, PO`, 'success');
   };
 
   const removeHsn = async (code) => {
     const ok = await confirmAction({ title: 'Remove HSN/SAC?', message: code, confirmLabel: 'Remove', tone: 'danger' });
     if (!ok) return;
-    const next = hsnList.filter(x => x !== code);
-    setHsnList(next);
-    saveJson(SAC_KEY, next);
+    setHsnList(removeHsnCode(code));
     toast('Removed', 'success');
   };
 
@@ -115,18 +110,14 @@ export default function CostCentersView() {
     const t = String(v).trim();
     if (!t) return;
     if (unitList.includes(t)) { toast('Already in list', 'info'); return; }
-    const next = [...unitList, t];
-    setUnitList(next);
-    saveJson(UNIT_KEY, next);
+    setUnitList(addUnit(t));
     toast(`Unit "${t}" saved`, 'success');
   };
 
   const removeUnit = async (u) => {
     const ok = await confirmAction({ title: 'Remove unit?', message: u, confirmLabel: 'Remove', tone: 'danger' });
     if (!ok) return;
-    const next = unitList.filter(x => x !== u);
-    setUnitList(next);
-    saveJson(UNIT_KEY, next);
+    setUnitList(removeUnit(u));
     toast('Removed', 'success');
   };
 
@@ -141,18 +132,14 @@ export default function CostCentersView() {
     const t = String(v).trim();
     if (!t) return;
     if (expList.includes(t)) { toast('Already in list', 'info'); return; }
-    const next = [...expList, t];
-    setExpList(next);
-    saveJson(EXP_KEY, next);
+    setExpList(addExpenseCategory(t));
     toast(`Category "${t}" saved`, 'success');
   };
 
   const removeExp = async (c) => {
     const ok = await confirmAction({ title: 'Remove category?', message: c, confirmLabel: 'Remove', tone: 'danger' });
     if (!ok) return;
-    const next = expList.filter(x => x !== c);
-    setExpList(next);
-    saveJson(EXP_KEY, next);
+    setExpList(removeExpenseCategory(c));
     toast('Removed', 'success');
   };
 
@@ -258,16 +245,30 @@ export default function CostCentersView() {
           </div>
           <div className="table-responsive">
             <table className="data-table" style={{ width: '100%' }}>
-              <thead><tr><th>CODE</th><th></th></tr></thead>
+              <thead><tr><th>CODE</th><th>TYPE</th><th>DESCRIPTION</th><th>GST %</th><th></th></tr></thead>
               <tbody>
-                {hsnList.map(code => (
+                {hsnList.map(code => {
+                  const info = (() => {
+                    try {
+                      const s = suggestGstRate(code);
+                      if (s && (s.label || s.rate != null)) return s;
+                    } catch { /* */ }
+                    const isService = /^99/.test(String(code));
+                    return { label: isService ? 'Service (SAC)' : 'Goods (HSN)', rate: null, kind: isService ? 'service' : 'goods' };
+                  })();
+                  const isService = /^99/.test(String(code)) || /service/i.test(info.label || '');
+                  return (
                   <tr key={code}>
                     <td style={{ fontFamily: 'monospace' }}>{code}</td>
+                    <td>{isService ? 'Service' : 'Goods'}</td>
+                    <td>{info.label || '—'}</td>
+                    <td>{info.rate != null ? info.rate + '%' : '—'}</td>
                     <td style={{ width: 80 }}>
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => removeHsn(code)}>Remove</button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
                 {!hsnList.length && (
                   <tr><td colSpan={2} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No codes yet — click Add</td></tr>
                 )}

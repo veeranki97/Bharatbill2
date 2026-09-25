@@ -13,6 +13,7 @@ import { emptyWOItem, calcItemAmount } from '../utils/workOrder';
 import { formatCurrency } from '../utils';
 import { toast } from './Toast';
 import ActionMenu from './ActionMenu';
+import { getHsnMaster, getUnitMaster } from '../utils/masterData';
 function downloadRowsCsv(filename, rows, cols) {
   const esc = v => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const headers = cols.map(c => c.label);
@@ -201,13 +202,15 @@ function printPO(po, profile, fingerprint) {
 export default function PurchaseOrdersView() {
   const [list, setList] = useState([]);
   const [costCenters, setCostCenters] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [shipSites, setShipSites] = useState(['Main Site']);
 
   // Master HSN/SAC + units (same keys as InvoiceGenerator)
   const [hsnMaster, setHsnMaster] = useState([]);
   const [unitMaster, setUnitMaster] = useState(['Nos', 'Hrs', 'Days', 'Kg', 'Ltr', 'Mtr', 'Sqft', 'Job']);
   useEffect(() => {
     try {
-      const custom = JSON.parse(localStorage.getItem('freegstbill_custom_sac') || '[]');
+      const custom = getHsnMaster();
       setHsnMaster(Array.isArray(custom) ? custom.filter(Boolean) : []);
     } catch { /* */ }
     try {
@@ -240,7 +243,16 @@ export default function PurchaseOrdersView() {
   };
 
   useEffect(() => {
-    getAllCostCenters().then(setCostCenters).catch(() => {});
+    getAllCostCenters().then(setCostCenters);
+      getAllClients().then(cs => {
+        setClients(cs || []);
+        const sites = new Set(['Main Site']);
+        (cs || []).forEach(c => {
+          if (c.site) sites.add(c.site);
+          (c.sites || []).forEach(s => sites.add(s));
+        });
+        setShipSites([...sites]);
+      }).catch(() => {}).catch(() => {});
   }, []);
   useEffect(() => { load(); }, []);
 
@@ -359,9 +371,12 @@ export default function PurchaseOrdersView() {
           </div>
           <div className="form-group">
             <label className="form-label">Ship To (Site)</label>
-            <input className="form-input" list="po-sites" value={form.site || ''}
-              onChange={e => setForm({ ...form, site: e.target.value })}
-              placeholder="Delivery site" />
+            <select className="form-input" value={form.site || 'Main Site'}
+              onChange={e => setForm({ ...form, site: e.target.value })}>
+              {(typeof shipSites !== 'undefined' ? shipSites : ['Main Site']).map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
             <datalist id="po-sites">
               {(form.site ? [form.site] : []).map(s => <option key={s} value={s} />)}
             </datalist>
@@ -376,6 +391,8 @@ export default function PurchaseOrdersView() {
               <option value="fully-received">Fully Received</option>
               <option value="cancelled">Cancelled</option>
             </select>
+          </div>
+          <div className="form-group">
             <label className="form-label">Cost Center *</label>
             <select className="form-input" value={form.costCenterId || ''}
               onChange={e => setForm({ ...form, costCenterId: e.target.value })}>
@@ -389,17 +406,6 @@ export default function PurchaseOrdersView() {
             <label className="form-label">GST %</label>
             <input type="number" className="form-input" value={form.taxRate}
               onChange={e => setForm({ ...form, taxRate: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Status</label>
-            <select className="form-input" value={form.status}
-              onChange={e => setForm({ ...form, status: e.target.value })}>
-              <option value="draft">Draft</option>
-              <option value="issued">Issued</option>
-              <option value="partial">Partial</option>
-              <option value="closed">Closed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
           </div>
         </div>
 

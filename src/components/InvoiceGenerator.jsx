@@ -7,6 +7,7 @@ import { INVOICE_TYPES, generateEWayBillJSON, formatCurrency, getCountryConfig, 
 // isValidIndianGSTIN used in save validation
 import { isValidIndianGSTIN as _isValidGSTIN } from '../utils';
 import { canInvoiceAgainstWO, woItemsToInvoiceItems } from '../utils/workOrder';
+import { getHsnMaster, addHsnCode, getUnitMaster } from '../utils/masterData';
 import { journalFromTaxInvoice } from '../utils/ledger';
 import { getPrintSettings, savePrintSettings } from '../utils/printSettings';
 import { openWhatsAppShare } from '../utils/share';
@@ -343,11 +344,11 @@ const LineItem = memo(function LineItem({
               }
             }}>
             <option value="">— SAC/HSN —</option>
-            {item.hsn && ![...(() => { try { return JSON.parse(localStorage.getItem('fgsb_custom_sac')||'[]'); } catch { return []; } })()].includes(item.hsn) && (
+            {item.hsn && ![...(() => { try { return getHsnMaster(); } catch { return []; } })()].includes(item.hsn) && (
               <option value={item.hsn}>{item.hsn}</option>
             )}
             {(() => {
-              try { return JSON.parse(localStorage.getItem('fgsb_custom_sac') || '[]'); } catch { return []; }
+              try { return getHsnMaster(); } catch { return []; }
             })().map(c => <option key={c} value={c}>{c}</option>)}
             {['998311','998312','998313','998314','998399','998599','9954','9965','9972'].map(c => (
               <option key={'d'+c} value={c}>{c}</option>
@@ -631,6 +632,8 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   const clientNameRef = useRef(null);
   const clientSuggestionsRef = useRef(null);
   const [products, setProducts] = useState([]);
+  const [hsnMasterList, setHsnMasterList] = useState(() => getHsnMaster());
+  const [unitMasterList, setUnitMasterList] = useState(() => getUnitMaster());
   const [productSearch, setProductSearch] = useState({ itemId: null, query: '' });
   const [invoiceOptions, setInvoiceOptions] = useState(() => {
     try {
@@ -1007,6 +1010,8 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       }
     });
     getAllProducts().then(setProducts);
+    setHsnMasterList(getHsnMaster());
+    setUnitMasterList(getUnitMaster());
     // v1.10.24 — Load bills once for client-credit lookup. Refreshed after
     // save (inside saveInvoiceToDB's success path) so the balance stays
     // current when the same session creates multiple invoices for one client.
@@ -1351,6 +1356,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       const suggested = suggestGstRate(trimmed);
       if (suggested) handleItemChange(itemId, 'taxPercent', suggested.rate);
     } catch { /* ignore */ }
+    setHsnMasterList(getHsnMaster());
     toast(`SAC "${trimmed}" added`, 'success');
   }, [handleItemChange]);
 
@@ -4130,11 +4136,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                   })
                   .map(wo => (
                     <option key={wo.id} value={wo.id}>
-                      {wo.woNumber || wo.id}
-                      {wo.clientName ? ` · ${wo.clientName}` : ''}
-                      {wo.title ? ` · ${wo.title}` : ''}
-                      {wo.site ? ` · ${wo.site}` : ''}
-                      {` · ₹${Number(wo.approvedBudget || wo.total || 0).toLocaleString('en-IN')}`}
+                      {wo.woNumber || wo.id} — {wo.title || wo.clientName || 'WO'}{wo.site ? ` · ${wo.site}` : ''} (₹{Number(wo.approvedBudget || 0).toLocaleString('en-IN')})
                     </option>
                   ))}
               </select>
@@ -4276,7 +4278,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
 
           {/* Line Items */}
           <datalist id="sac-codes">
-            {[...new Set((products || []).map(p => p.hsn).filter(Boolean))].map(h => (
+            {[...new Set([...(hsnMasterList || []), ...((products || []).map(p => p.hsn).filter(Boolean))])].map(h => (
               <option key={h} value={h} />
             ))}
             <option value="998311" /><option value="998312" /><option value="998313" />
