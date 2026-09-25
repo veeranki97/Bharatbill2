@@ -486,6 +486,9 @@ function App() {
     const clone = JSON.parse(JSON.stringify(bill));
     clone._isDuplicate = true;
     clone._convertToType = 'tax-invoice';
+    clone._sourceProformaId = bill.id;
+    clone._sourceProformaNumber = bill.invoiceNumber || bill.id;
+    clone.id = undefined;
     setEditingBill(clone);
     setCurrentView('new');
   };

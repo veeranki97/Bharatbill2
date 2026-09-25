@@ -88,10 +88,10 @@ export function canInvoiceAgainstWO(wo, invoiceTotal, allBills, invoiceItems) {
     return { ok: false, reason: 'Work Order is not approved' };
   }
   const usage = calcWOUsage(wo, allBills);
-  if (Number(invoiceTotal) > usage.remaining + 0.01) {
+  if (Number(invoiceTotal) > usage.remaining + 5.0) {
     return {
       ok: false,
-      reason: `Invoice ₹${Number(invoiceTotal).toFixed(2)} exceeds remaining WO budget ₹${usage.remaining.toFixed(2)}`,
+      reason: `Invoice ₹${Number(invoiceTotal).toFixed(2)} exceeds remaining WO budget ₹${usage.remaining.toFixed(2)} (₹5 tolerance)`,
     };
   }
   // Qty guard when items present — hard stop on over-billing (e.g. WO 100, invoice 101)

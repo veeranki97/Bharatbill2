@@ -298,6 +298,15 @@ export default function PurchaseOrdersView() {
             </datalist>
           </div>
           <div className="form-group">
+            <label className="form-label">PO Status</label>
+            <select className="form-input" value={form.status || 'issued'}
+              onChange={e => setForm({ ...form, status: e.target.value })}>
+              <option value="draft">Draft</option>
+              <option value="issued">Issued</option>
+              <option value="partially-received">Partially Received</option>
+              <option value="fully-received">Fully Received</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
             <label className="form-label">Cost Center *</label>
             <select className="form-input" value={form.costCenterId || ''}
               onChange={e => setForm({ ...form, costCenterId: e.target.value })}>
