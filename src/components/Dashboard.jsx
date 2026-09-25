@@ -351,11 +351,8 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
         }
         if (reconcileWrites.length) await Promise.allSettled(reconcileWrites);
       } catch { /* non-fatal — worst case, user still sees orphaned state */ }
-      // Only notify when something meaningful changed (avoid noise on every status click / remount)
       if (reconciled > 0) {
-        console.info('[reconcile] merged', reconciled, 'orphaned receipt(s) into invoice payments');
-        // Soft info — not a success "you got paid" signal when user just clicked Paid
-        toast(`Synced ${reconciled} receipt(s) onto invoice payment history`, 'info', 4000);
+        toast(`Reconciled ${reconciled} orphaned payment${reconciled === 1 ? '' : 's'} against ${reconciled === 1 ? 'its' : 'their'} invoice${reconciled === 1 ? '' : 's'}`, 'success', 6000);
       }
 
       // Auto-detect overdue: if due date passed and not paid, mark as overdue.
@@ -501,10 +498,6 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
           againstInvoice: bill.invoiceNumber || bill.id,
         };
         updated.payments = [...(bill.payments || []), paymentEntry];
-        updated.paidAmount = Number(updated.paidAmount) || postAmt;
-        if (updated.data && typeof updated.data === 'object') {
-          updated.data = { ...updated.data, payments: updated.payments, paidAmount: updated.paidAmount };
-        }
         await saveBill(updated, { overwrite: true });
         try {
           const jnl = journalFromPayment(updated, postAmt, paymentEntry.mode, {
@@ -530,54 +523,75 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
       } else {
         await saveBill(updated, { overwrite: true });
       }
+    
     } else if (newStatus === 'unpaid' || newStatus === 'pending') {
       const proceed = await confirmAction({
         title: 'Mark unpaid and reverse payments?',
-        message: 'Reverses ledger and cash-book entries for receipts on this invoice.',
+        message: 'Clears paid amount, reverses ledger journals, and updates cash book. This applies for both Partial and Paid.',
         confirmLabel: 'Reverse & mark unpaid',
         tone: 'warning',
       }).catch(() => false);
       if (!proceed) return;
+      const priorPayments = [...(bill.payments || [])];
+      const priorPaid = Number(bill.paidAmount) || priorPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
       updated.paidAmount = 0;
       updated.payments = [];
       updated.status = 'unpaid';
-      // Clear nested data.payments if present (UI sometimes reads both)
       if (updated.data && typeof updated.data === 'object') {
         updated.data = { ...updated.data, payments: [], paidAmount: 0 };
       }
       await saveBill(updated, { overwrite: true });
+      let reversed = 0;
       try {
         const journals = await getAllJournals().catch(() => []);
         const inv = String(bill.invoiceNumber || '');
         const bid = String(bill.id || '');
         const related = (journals || []).filter(j => {
           if (j.refType === 'payment-reversal') return false;
+          if (j.refType !== 'payment' && j.refType !== 'advance') return false;
           const id = String(j.id || '');
-          const match =
-            j.refType === 'payment' && (
-              String(j.refId || '') === bid || String(j.refId || '') === inv
-              || String(j.againstInvoice || '') === inv
-              || String(j.invoiceNumber || '') === inv
-              || id.includes(bid) || (inv && id.includes(inv.replace(/[^a-zA-Z0-9]/g, '_')))
-            );
-          return match;
+          return (
+            String(j.refId || '') === bid || String(j.refId || '') === inv
+            || String(j.againstInvoice || '') === inv
+            || String(j.invoiceNumber || '') === inv
+            || (bid && id.includes(bid)) || (inv && id.includes(inv.replace(/[^a-zA-Z0-9]/g, '_')))
+          );
         });
-        let reversed = 0;
         for (const j of related) {
           if ((journals || []).some(x => x.reversesId === j.id)) continue;
-          const rev = journalReversePayment(j, `Unpaid — reverse ${bill.invoiceNumber || bill.id}`);
-          if (rev) {
-            await saveJournal(rev);
-            reversed++;
+          const rev = journalReversePayment(j, `Unpaid — reverse ${inv || bid}`);
+          if (rev) { await saveJournal(rev); reversed++; }
+        }
+        // If no journal rows found but bill had payments (cash book may still show them),
+        // synthesize reversing journals from the payment list so GL catches up.
+        if (reversed === 0 && priorPayments.length > 0) {
+          for (const p of priorPayments) {
+            const amt = Number(p.amount) || 0;
+            if (amt < 0.01) continue;
+            const synth = journalFromPayment(
+              { ...bill, payments: [] },
+              amt,
+              p.mode || 'bank-transfer',
+              { id: 'rev_' + (p.id || Date.now()), date: p.date || new Date().toISOString().split('T')[0], party: bill.clientName || bill.data?.client?.name }
+            );
+            if (synth) {
+              const rev = journalReversePayment(synth, `Unpaid — reverse payment ${p.receiptNo || p.id || ''} on ${inv || bid}`);
+              if (rev) {
+                rev.id = 'jnl_rev_synth_' + (p.id || Date.now()) + '_' + Math.random().toString(36).slice(2, 6);
+                await saveJournal(rev);
+                reversed++;
+              }
+            }
           }
         }
-        if (reversed > 0) toast(`Reversed ${reversed} ledger receipt(s)`, 'success');
-        else if (related.length === 0) toast('Marked unpaid (no matching payment journal found to reverse)', 'info');
+        if (reversed > 0) toast(`Reversed ${reversed} ledger entry(ies). Paid amount is now ₹0.`, 'success');
+        else if (priorPaid > 0.01) toast('Marked unpaid (₹0). No journals found to reverse — check Books → Journals.', 'warning');
+        else toast('Marked unpaid', 'info');
       } catch (e) {
         console.warn('[ledger] unpaid reversal failed', e);
         toast('Marked unpaid but ledger reverse failed — check Journals', 'warning');
       }
-    } else {
+} else {
       await saveBill(updated, { overwrite: true });
     }
     toast(`Marked as ${STATUS_CONFIG[updated.status]?.label || updated.status}`, 'info');

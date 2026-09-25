@@ -7,6 +7,7 @@ export const ACCOUNTS = {
   SGST_OUT: 'Output SGST',
   IGST_OUT: 'Output IGST',
   DEBTORS: 'Sundry Debtors',
+  ADVANCE_RECEIVED: 'Advance from Customers',
   CREDITORS: 'Sundry Creditors',
   CASH_BANK: 'Bank',
   CASH: 'Cash',
@@ -33,6 +34,7 @@ export const ACCOUNT_TYPES = {
   [ACCOUNTS.SGST_OUT]: 'liability',
   [ACCOUNTS.IGST_OUT]: 'liability',
   [ACCOUNTS.DEBTORS]: 'asset',
+  [ACCOUNTS.ADVANCE_RECEIVED]: 'liability',
   [ACCOUNTS.CREDITORS]: 'liability',
   [ACCOUNTS.CASH_BANK]: 'asset',
   [ACCOUNTS.CASH]: 'asset',
@@ -127,11 +129,16 @@ export function journalFromPayment(bill, paymentAmount, mode = 'bank', paymentMe
   const party = bill.data?.client?.name || bill.clientName || paymentMeta.party || '';
   const payDate = paymentMeta.date || new Date().toISOString().split('T')[0];
   const payId = paymentMeta.id || String(Date.now());
+  const isAdvance = /advance/i.test(String(mode)) || /advance/i.test(String(paymentMeta.note || ''))
+    || (bill.invoiceType || bill.data?.invoiceType || '').toLowerCase().includes('proforma');
+  const creditAcc = isAdvance ? ACCOUNTS.ADVANCE_RECEIVED : ACCOUNTS.DEBTORS;
   return {
     id: 'jnl_pay_' + (bill.id || bill.invoiceNumber) + '_' + payId,
     date: payDate,
-    narration: `Receipt against ${bill.invoiceNumber || bill.id || ''} — ${party || 'customer'}`,
-    refType: 'payment',
+    narration: isAdvance
+      ? `Advance received — ${party || 'customer'}`
+      : `Receipt against ${bill.invoiceNumber || bill.id || ''} — ${party || 'customer'}`,
+    refType: isAdvance ? 'advance' : 'payment',
     refId: bill.id || bill.invoiceNumber,
     party,
     clientName: party,
@@ -141,7 +148,7 @@ export function journalFromPayment(bill, paymentAmount, mode = 'bank', paymentMe
     costCenterId: bill.costCenterId || bill.data?.costCenterId || null,
     entries: [
       { account: bankAcc, debit: amt, credit: 0, party },
-      { account: ACCOUNTS.DEBTORS, debit: 0, credit: amt, party },
+      { account: creditAcc, debit: 0, credit: amt, party },
     ],
   };
 }

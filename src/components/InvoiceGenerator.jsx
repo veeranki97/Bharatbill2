@@ -575,7 +575,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     placeOfSupply: '',
     originalInvoiceRef: '',
     periodStart: '', revisionNo: '', vehicleNo: '',
-    periodEnd: '',
+    periodEnd: '', irnNumber: '', irnAckDate: '',
     workDetails: '',
     site: '',
     // v1.10.11 — Ship To fields. Default: same as billing (no extra
@@ -1688,7 +1688,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       lastPrintedAt: extraPatch.lastPrintedAt ?? editingBill?.lastPrintedAt ?? null,
       // Work Order link (custom) — used by budget ceiling check
       workOrderId: selectedWorkOrderId || undefined,
-      data: { profile, client, details: { ...details, invoiceNumber: finalInvoiceNumber, periodStart: details.periodStart || '', periodEnd: details.periodEnd || '', workDetails: details.workDetails || '', workOrderNo: details.workOrderNo || '', site: client.site || details.site || '' }, items, totals, invoiceType, customTerms, customNotes, internalNote, extraSections, invoiceOptions: invoiceOptionsWithSnapshot, taxInclusive, workOrderId: selectedWorkOrderId || undefined, site: client.site || '', convertedFromProformaId: editingBill?._sourceProformaId || undefined, convertedFromProformaNumber: editingBill?._sourceProformaNumber || undefined }
+      data: { profile, client, details: { ...details, invoiceNumber: finalInvoiceNumber, periodStart: details.periodStart || '', periodEnd: details.periodEnd || '', workDetails: details.workDetails || '', workOrderNo: details.workOrderNo || '', site: client.site || details.site || '' }, items, totals, invoiceType, customTerms, customNotes, internalNote, extraSections, invoiceOptions: invoiceOptionsWithSnapshot, taxInclusive, workOrderId: selectedWorkOrderId || undefined, site: client.site || '' }
     };
     // Editing an existing bill → always overwrite. NEW bill on second-and-
     // later save this session → also overwrite (same invoice number, would
@@ -1838,59 +1838,6 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
         if (invoiceType === 'tax-invoice' || invoiceType === 'Tax Invoice') {
           const jnl = journalFromTaxInvoice(bill);
           if (jnl) await saveJournal(jnl);
-
-      // Proforma -> Tax Invoice lock + payment transfer
-      try {
-        const srcId = editingBill?._sourceProformaId || bill.data?.convertedFromProformaId;
-        const srcNo = editingBill?._sourceProformaNumber || bill.data?.convertedFromProformaNumber;
-        if (srcId && String(invoiceType || '').toLowerCase().includes('tax')) {
-          const all = await getAllBills();
-          const pi = all.find(b => b.id === srcId || b.invoiceNumber === srcId);
-          if (pi && pi.status !== 'converted') {
-            const locked = {
-              ...pi,
-              status: 'converted',
-              convertedTo: bill.invoiceNumber || bill.id,
-              convertedAt: new Date().toISOString(),
-              data: { ...(pi.data || {}), lockedReason: 'CONVERTED TO ' + (bill.invoiceNumber || bill.id) },
-            };
-            const piPays = [...(pi.payments || [])];
-            if (piPays.length) {
-              const transferred = piPays.map(p => ({
-                ...p,
-                note: ((p.note || '') + ' Auto-Linked from: ' + (srcNo || srcId)).trim(),
-                againstInvoice: bill.invoiceNumber || bill.id,
-                linkedFromProforma: srcNo || srcId,
-              }));
-              bill.payments = [...(bill.payments || []), ...transferred];
-              const paidSum = (bill.payments || []).reduce((s, p) => s + (Number(p.amount) || 0), 0);
-              bill.paidAmount = paidSum;
-              const tot = Number(bill.totalAmount) || 0;
-              bill.status = paidSum >= tot - 1 ? 'paid' : (paidSum > 0 ? 'partial' : bill.status || 'unpaid');
-              await saveBill(bill, { overwrite: true });
-              locked.payments = [];
-              locked.paidAmount = 0;
-            }
-            await saveBill(locked, { overwrite: true });
-            toast('Proforma ' + (srcNo || srcId) + ' locked -> ' + (bill.invoiceNumber || ''), 'success');
-          }
-        }
-      } catch (convErr) { console.warn('Proforma convert lock failed', convErr); }
-
-      try {
-        if (selectedWorkOrderId) {
-          const { deriveWOStatus } = await import('../utils/workOrder');
-          const { getAllWorkOrders, saveWorkOrder } = await import('../store');
-          const wos = await getAllWorkOrders();
-          const allB = await getAllBills();
-          const woRow = wos.find(w => w.id === selectedWorkOrderId);
-          if (woRow) {
-            const st = deriveWOStatus(woRow, allB);
-            if (st && st !== woRow.status) await saveWorkOrder({ ...woRow, status: st }, { overwrite: true });
-          }
-        }
-      } catch (e) { console.warn('WO status refresh', e); }
-
         }
       } catch (jErr) {
         console.warn('Journal post skipped:', jErr);
@@ -4134,12 +4081,13 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                     ...prev,
                     periodStart: wo.periodStart || prev.periodStart || '',
                     periodEnd: wo.periodEnd || prev.periodEnd || '',
-                    workDetails: wo.workDetails || wo.desc || wo.description || wo.notes || prev.workDetails || '',
+                    workDetails: [wo.title, wo.workDetails || wo.desc || wo.description, wo.notes].filter(Boolean).join(' — ') || prev.workDetails || '',
                     site: wo.site || prev.site || '',
                     workOrderNo: wo.woNumber || wo.woNo || wo.number || prev.workOrderNo || '',
                   }));
-                  if (wo.notes || wo.terms) {
+                  if (wo.notes || wo.terms || wo.title) {
                     if (wo.notes) setCustomNotes(wo.notes);
+                    else if (wo.title) setCustomNotes(wo.title);
                     if (wo.terms) setCustomTerms(wo.terms);
                   }
                   if (wo.items && wo.items.length) {

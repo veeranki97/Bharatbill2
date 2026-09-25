@@ -14,6 +14,27 @@ import { formatCurrency } from '../utils';
 import { toast } from './Toast';
 import ActionMenu from './ActionMenu';
 
+/** GST on WO lines — same split rules as PO (same state → CGST+SGST else IGST) */
+function calcWOTotals(items, taxRate, clientState, hostState) {
+  const sub = (items || []).reduce((s, it) => s + calcItemAmount(it), 0);
+  const rate = Number(taxRate) || 0;
+  const gst = +(sub * rate / 100).toFixed(2);
+  const same =
+    (clientState || '').trim().toLowerCase() === (hostState || '').trim().toLowerCase()
+    && !!(clientState || '').trim();
+  let cgst = 0, sgst = 0, igst = 0;
+  if (rate > 0) {
+    if (same) {
+      cgst = +(gst / 2).toFixed(2);
+      sgst = +(gst - cgst).toFixed(2);
+    } else {
+      igst = gst;
+    }
+  }
+  return { sub, gst, cgst, sgst, igst, total: +(sub + gst).toFixed(2), isInterstate: !same };
+}
+
+
 export default function WorkOrdersView() {
   const [list, setList] = useState([]);
   const [bills, setBills] = useState([]);
@@ -58,6 +79,17 @@ export default function WorkOrdersView() {
 
   useEffect(() => { load(); }, []);
 
+  // Auto-sync Approved Budget = taxable + GST whenever lines / rate change
+  useEffect(() => {
+    if (!form) return;
+    const items = form.items || [];
+    const t = calcWOTotals(items, form.taxRate ?? 18, form.clientState, form.hostState);
+    if (Math.abs((Number(form.approvedBudget) || 0) - t.total) > 0.009) {
+      setForm(prev => prev ? { ...prev, approvedBudget: t.total } : prev);
+    }
+  }, [form?.items, form?.taxRate, form?.clientState, form?.hostState]);
+
+
   const openNew = () =>
     setForm({
       id: 'wo_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -66,6 +98,8 @@ export default function WorkOrdersView() {
       site: 'Main Site',
       title: '',
       approvedBudget: 0,
+      taxRate: 18,
+      clientState: '',
       status: 'draft',
       periodStart: '',
       periodEnd: '',
@@ -80,11 +114,11 @@ export default function WorkOrdersView() {
       const row = { ...items[idx], [field]: value };
       if (field === 'qty' || field === 'rate') row.amount = calcItemAmount(row);
       items[idx] = row;
-      const sum = items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+      const t = calcWOTotals(items, prev.taxRate ?? 18, prev.clientState, prev.hostState);
       return {
         ...prev,
         items,
-        approvedBudget: prev.approvedBudget > 0 ? prev.approvedBudget : sum,
+        approvedBudget: t.total,
       };
     });
   };
@@ -110,8 +144,9 @@ export default function WorkOrdersView() {
       ...it,
       amount: calcItemAmount(it),
     }));
-    const itemsTotal = items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
-    const budget = Number(form.approvedBudget) > 0 ? Number(form.approvedBudget) : itemsTotal;
+    const hostState = (typeof window !== 'undefined' && localStorage.getItem('freegstbill_profile_state')) || '';
+    const totals = calcWOTotals(items, form.taxRate ?? 18, form.clientState, form.hostState || hostState);
+    const budget = totals.total; // always include GST — auto from WO value
     if (budget <= 0) return toast('Set budget or add line items with amount', 'error');
 
     try {
@@ -219,7 +254,7 @@ export default function WorkOrdersView() {
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
-          <div className="modal" style={{
+          <div className="modal" style={{ maxWidth: 'min(1100px, 96vw)', width: '100%', 
             background: 'var(--bg-card, #fff)', borderRadius: 12, padding: '1.5rem',
             width: 'min(960px, 98vw)', maxHeight: '95vh', overflowY: 'auto',
             boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
@@ -293,7 +328,12 @@ export default function WorkOrdersView() {
               </div>
               <div className="form-group">
                 <label className="form-label">Approved Budget (₹)</label>
+                <label className="form-label">Tax Rate %</label>
+                <input type="number" className="form-input" value={form.taxRate ?? 18}
+                  onChange={e => setForm({ ...form, taxRate: Number(e.target.value) || 0 })} />
+                <label className="form-label">Approved Budget (₹) — auto from lines + GST</label>
                 <input type="number" className="form-input" value={form.approvedBudget}
+                  readOnly title="Auto-calculated from line items + GST"
                   onChange={e => setForm({ ...form, approvedBudget: Number(e.target.value) || 0 })}
                   min="0" step="0.01" />
               </div>
@@ -374,6 +414,18 @@ export default function WorkOrdersView() {
 
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
               <button className="btn btn-secondary" onClick={() => setForm(null)}>Cancel</button>
+              {(() => {
+                const t = calcWOTotals(form.items, form.taxRate ?? 18, form.clientState, form.hostState);
+                return (
+                  <div style={{ marginRight: 'auto', fontSize: '0.9rem', lineHeight: 1.55, textAlign: 'left' }}>
+                    <div>Taxable: <b>{formatCurrency(t.sub)}</b> · GST rate {form.taxRate ?? 18}%</div>
+                    {t.isInterstate
+                      ? <div>IGST: <b>{formatCurrency(t.igst)}</b></div>
+                      : <div>CGST <b>{formatCurrency(t.cgst)}</b> + SGST <b>{formatCurrency(t.sgst)}</b></div>}
+                    <div><b>Approved Budget (incl. GST): {formatCurrency(t.total)}</b></div>
+                  </div>
+                );
+              })()}
               <button className="btn btn-primary" onClick={save}>Save Work Order</button>
             </div>
           </div>
