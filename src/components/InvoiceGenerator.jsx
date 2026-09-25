@@ -1781,8 +1781,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     if (details.periodEnd && invDate) {
       const pe = new Date(details.periodEnd);
       if (invDate > pe) {
-        toast('Invoice date must be on or before Bill Period End', 'error');
-        return;
+        // Invoice date may be after Bill Period End (normal practice)
       }
     }
     // E-Way: only for goods lines (HSN not SAC-style) above threshold from settings

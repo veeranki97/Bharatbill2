@@ -208,6 +208,113 @@ function deleteFile(filePath) {
 // ========================
 // BILLS
 // ========================
+/**
+ * Server-side GST recompute (Finding 12).
+ * Never trust browser-only tax figures for books / GSTR.
+ * Uses same intra/inter split rules as the client: same state → CGST+SGST, else IGST.
+ */
+function money2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+function stateCodeFromGstin(gstin) {
+  const g = String(gstin || '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+  if (g.length >= 2 && /^\d{2}/.test(g)) return g.slice(0, 2);
+  return '';
+}
+
+function normalizeStateKey(s) {
+  return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function isInterstateBill(profile, client, details) {
+  const hostGst = stateCodeFromGstin(profile?.gstin);
+  const clientGst = stateCodeFromGstin(client?.gstin);
+  if (hostGst && clientGst) return hostGst !== clientGst;
+  const hostState = normalizeStateKey(profile?.state);
+  const pos = normalizeStateKey(details?.placeOfSupply || client?.state);
+  if (hostState && pos) return hostState !== pos;
+  return false;
+}
+
+function recomputeBillTax(bill) {
+  if (!bill || typeof bill !== 'object') return { bill, warnings: ['invalid bill'] };
+  const data = bill.data || {};
+  const items = Array.isArray(data.items) ? data.items : [];
+  const profile = data.profile || {};
+  const client = data.client || {};
+  const details = data.details || {};
+  const invType = (data.invoiceType || bill.type || 'tax-invoice').toLowerCase();
+  const opts = data.invoiceOptions || {};
+  const showGST = opts.showGST !== false
+    && !/bill-of-supply|quotation|proforma|estimate|delivery/.test(invType);
+  const reverseCharge = !!opts.reverseCharge;
+
+  let taxable = 0;
+  let taxTotal = 0;
+  for (const it of items) {
+    const qty = Math.max(0, Number(it.quantity) || Number(it.qty) || 0);
+    const rate = Math.max(0, Number(it.rate) || 0);
+    const disc = Math.max(0, Number(it.discount) || 0);
+    let line = Math.max(0, qty * rate - disc);
+    const taxPct = showGST ? Math.max(0, Number(it.taxPercent) || Number(it.taxRate) || 0) : 0;
+    if (opts.taxInclusive && taxPct > 0) {
+      const base = line / (1 + taxPct / 100);
+      const tax = line - base;
+      taxable += base;
+      taxTotal += tax;
+    } else {
+      taxable += line;
+      taxTotal += line * taxPct / 100;
+    }
+  }
+  taxable = money2(taxable);
+  taxTotal = money2(taxTotal);
+
+  let cgst = 0, sgst = 0, igst = 0;
+  if (showGST && taxTotal > 0 && !reverseCharge) {
+    if (isInterstateBill(profile, client, details)) {
+      igst = taxTotal;
+    } else {
+      cgst = money2(taxTotal / 2);
+      sgst = money2(taxTotal - cgst);
+    }
+  }
+
+  const roundOff = money2(Number(data.totals?.roundOff) || Number(bill.roundOff) || 0);
+  const grand = money2(taxable + cgst + sgst + igst + roundOff);
+
+  const prevTotal = money2(bill.totalAmount);
+  const prevTax = money2(bill.totalTaxAmount);
+  const warnings = [];
+  if (Math.abs(prevTotal - grand) > 1.0 || Math.abs(prevTax - money2(cgst + sgst + igst)) > 1.0) {
+    warnings.push(`Tax recalculated on server (client total ${prevTotal} → ${grand})`);
+  }
+
+  const totals = {
+    ...(data.totals || {}),
+    subtotal: taxable,
+    subTotal: taxable,
+    cgst, sgst, igst,
+    totalTax: money2(cgst + sgst + igst),
+    totalTaxAmount: money2(cgst + sgst + igst),
+    roundOff,
+    total: grand,
+    grandTotal: grand,
+  };
+
+  bill.totalAmount = grand;
+  bill.totalTaxAmount = money2(cgst + sgst + igst);
+  bill.data = {
+    ...data,
+    totals,
+    serverTaxVerified: true,
+    serverTaxWarnings: warnings,
+  };
+  return { bill, warnings };
+}
+
+
 app.get('/api/bills', (req, res) => {
   const bills = readAllFromDir('bills');
   bills.sort((a, b) => new Date(b.invoiceDate) - new Date(a.invoiceDate));
@@ -215,7 +322,7 @@ app.get('/api/bills', (req, res) => {
 });
 
 app.post('/api/bills', (req, res) => {
-  const bill = req.body;
+  let bill = req.body;
   if (!bill || !bill.id) return res.status(400).json({ error: 'Bill must have an id' });
   const filePath = path.join(DATA_DIR, 'bills', safeFileName(bill.id) + '.json');
 
@@ -231,8 +338,21 @@ app.post('/api/bills', (req, res) => {
       invoiceNumber: bill.id,
     });
   }
+
+  // Finding 12 / 18: server-side GST recompute (never trust browser-only tax)
+  let taxWarnings = [];
+  try {
+    if (typeof recomputeBillTax === 'function') {
+      const result = recomputeBillTax(bill);
+      bill = result.bill;
+      taxWarnings = result.warnings || [];
+    }
+  } catch (e) {
+    console.warn('[tax] recompute failed, storing client totals:', e.message);
+  }
+
   writeJSON(filePath, bill);
-  res.json({ success: true });
+  res.json({ success: true, taxWarnings });
 });
 
 // v1.10.31 — Data-F9.1: block deletion of a bill that's a client-credit

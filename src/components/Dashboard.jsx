@@ -351,8 +351,11 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
         }
         if (reconcileWrites.length) await Promise.allSettled(reconcileWrites);
       } catch { /* non-fatal — worst case, user still sees orphaned state */ }
+      // Only notify when something meaningful changed (avoid noise on every status click / remount)
       if (reconciled > 0) {
-        toast(`Reconciled ${reconciled} orphaned payment${reconciled === 1 ? '' : 's'} against ${reconciled === 1 ? 'its' : 'their'} invoice${reconciled === 1 ? '' : 's'}`, 'success', 6000);
+        console.info('[reconcile] merged', reconciled, 'orphaned receipt(s) into invoice payments');
+        // Soft info — not a success "you got paid" signal when user just clicked Paid
+        toast(`Synced ${reconciled} receipt(s) onto invoice payment history`, 'info', 4000);
       }
 
       // Auto-detect overdue: if due date passed and not paid, mark as overdue.
@@ -498,6 +501,10 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
           againstInvoice: bill.invoiceNumber || bill.id,
         };
         updated.payments = [...(bill.payments || []), paymentEntry];
+        updated.paidAmount = Number(updated.paidAmount) || postAmt;
+        if (updated.data && typeof updated.data === 'object') {
+          updated.data = { ...updated.data, payments: updated.payments, paidAmount: updated.paidAmount };
+        }
         await saveBill(updated, { overwrite: true });
         try {
           const jnl = journalFromPayment(updated, postAmt, paymentEntry.mode, {
@@ -534,23 +541,41 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
       updated.paidAmount = 0;
       updated.payments = [];
       updated.status = 'unpaid';
+      // Clear nested data.payments if present (UI sometimes reads both)
+      if (updated.data && typeof updated.data === 'object') {
+        updated.data = { ...updated.data, payments: [], paidAmount: 0 };
+      }
       await saveBill(updated, { overwrite: true });
       try {
         const journals = await getAllJournals().catch(() => []);
-        const related = (journals || []).filter(j =>
-          j.refType === 'payment' && (
-            j.refId === bill.id || j.refId === bill.invoiceNumber
-            || j.againstInvoice === bill.invoiceNumber
-            || j.invoiceNumber === bill.invoiceNumber
-          )
-        );
+        const inv = String(bill.invoiceNumber || '');
+        const bid = String(bill.id || '');
+        const related = (journals || []).filter(j => {
+          if (j.refType === 'payment-reversal') return false;
+          const id = String(j.id || '');
+          const match =
+            j.refType === 'payment' && (
+              String(j.refId || '') === bid || String(j.refId || '') === inv
+              || String(j.againstInvoice || '') === inv
+              || String(j.invoiceNumber || '') === inv
+              || id.includes(bid) || (inv && id.includes(inv.replace(/[^a-zA-Z0-9]/g, '_')))
+            );
+          return match;
+        });
+        let reversed = 0;
         for (const j of related) {
           if ((journals || []).some(x => x.reversesId === j.id)) continue;
           const rev = journalReversePayment(j, `Unpaid — reverse ${bill.invoiceNumber || bill.id}`);
-          if (rev) await saveJournal(rev);
+          if (rev) {
+            await saveJournal(rev);
+            reversed++;
+          }
         }
+        if (reversed > 0) toast(`Reversed ${reversed} ledger receipt(s)`, 'success');
+        else if (related.length === 0) toast('Marked unpaid (no matching payment journal found to reverse)', 'info');
       } catch (e) {
         console.warn('[ledger] unpaid reversal failed', e);
+        toast('Marked unpaid but ledger reverse failed — check Journals', 'warning');
       }
     } else {
       await saveBill(updated, { overwrite: true });
