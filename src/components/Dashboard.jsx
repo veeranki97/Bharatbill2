@@ -524,73 +524,103 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
         await saveBill(updated, { overwrite: true });
       }
     
+    
     } else if (newStatus === 'unpaid' || newStatus === 'pending') {
       const proceed = await confirmAction({
         title: 'Mark unpaid and reverse payments?',
-        message: 'Clears paid amount, reverses ledger journals, and updates cash book. This applies for both Partial and Paid.',
+        message: 'Clears paid amount to ₹0, posts reversing journals, and updates cash book. Works for both Partial and Paid.',
         confirmLabel: 'Reverse & mark unpaid',
         tone: 'warning',
       }).catch(() => false);
       if (!proceed) return;
-      const priorPayments = [...(bill.payments || [])];
+
+      const priorPayments = Array.isArray(bill.payments) ? [...bill.payments] : [];
       const priorPaid = Number(bill.paidAmount) || priorPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+
       updated.paidAmount = 0;
       updated.payments = [];
       updated.status = 'unpaid';
       if (updated.data && typeof updated.data === 'object') {
         updated.data = { ...updated.data, payments: [], paidAmount: 0 };
       }
-      await saveBill(updated, { overwrite: true });
+      try {
+        await saveBill(updated, { overwrite: true });
+      } catch (e) {
+        toast('Could not update invoice status', 'error');
+        return;
+      }
+
       let reversed = 0;
       try {
         const journals = await getAllJournals().catch(() => []);
         const inv = String(bill.invoiceNumber || '');
         const bid = String(bill.id || '');
         const related = (journals || []).filter(j => {
-          if (j.refType === 'payment-reversal') return false;
+          if (!j || j.refType === 'payment-reversal') return false;
           if (j.refType !== 'payment' && j.refType !== 'advance') return false;
+          if ((journals || []).some(x => x && x.reversesId === j.id)) return false;
           const id = String(j.id || '');
           return (
             String(j.refId || '') === bid || String(j.refId || '') === inv
             || String(j.againstInvoice || '') === inv
             || String(j.invoiceNumber || '') === inv
-            || (bid && id.includes(bid)) || (inv && id.includes(inv.replace(/[^a-zA-Z0-9]/g, '_')))
+            || (bid && id.includes(bid))
           );
         });
+
         for (const j of related) {
-          if ((journals || []).some(x => x.reversesId === j.id)) continue;
-          const rev = journalReversePayment(j, `Unpaid — reverse ${inv || bid}`);
-          if (rev) { await saveJournal(rev); reversed++; }
+          try {
+            const rev = journalReversePayment(j, `Unpaid — reverse ${inv || bid}`);
+            if (rev && rev.entries && rev.entries.length) {
+              await saveJournal(rev);
+              reversed++;
+            }
+          } catch (e) { console.warn('reverse one journal', e); }
         }
-        // If no journal rows found but bill had payments (cash book may still show them),
-        // synthesize reversing journals from the payment list so GL catches up.
-        if (reversed === 0 && priorPayments.length > 0) {
-          for (const p of priorPayments) {
+
+        // No matching journals: post direct reversing entries from payment amounts
+        if (reversed === 0 && (priorPayments.length > 0 || priorPaid > 0.01)) {
+          const toReverse = priorPayments.length
+            ? priorPayments
+            : [{ amount: priorPaid, mode: 'bank-transfer', date: new Date().toISOString().split('T')[0], id: 'manual' }];
+          for (const p of toReverse) {
             const amt = Number(p.amount) || 0;
             if (amt < 0.01) continue;
-            const synth = journalFromPayment(
-              { ...bill, payments: [] },
-              amt,
-              p.mode || 'bank-transfer',
-              { id: 'rev_' + (p.id || Date.now()), date: p.date || new Date().toISOString().split('T')[0], party: bill.clientName || bill.data?.client?.name }
-            );
-            if (synth) {
-              const rev = journalReversePayment(synth, `Unpaid — reverse payment ${p.receiptNo || p.id || ''} on ${inv || bid}`);
-              if (rev) {
-                rev.id = 'jnl_rev_synth_' + (p.id || Date.now()) + '_' + Math.random().toString(36).slice(2, 6);
-                await saveJournal(rev);
-                reversed++;
-              }
-            }
+            const isCash = String(p.mode || '').toLowerCase().includes('cash');
+            const party = bill.clientName || bill.data?.client?.name || '';
+            const rev = {
+              id: 'jnl_rev_direct_' + (p.id || Date.now()) + '_' + Math.random().toString(36).slice(2, 6),
+              date: p.date || new Date().toISOString().split('T')[0],
+              narration: `Unpaid reverse ₹${amt.toFixed(2)} — ${inv || bid}`,
+              refType: 'payment-reversal',
+              refId: bid || inv,
+              againstInvoice: inv,
+              party,
+              clientName: party,
+              entries: [
+                { account: isCash ? 'Cash' : 'Bank', debit: 0, credit: amt, party },
+                { account: 'Sundry Debtors', debit: amt, credit: 0, party },
+              ],
+            };
+            try {
+              await saveJournal(rev);
+              reversed++;
+            } catch (e) { console.warn('direct reverse failed', e); }
           }
         }
-        if (reversed > 0) toast(`Reversed ${reversed} ledger entry(ies). Paid amount is now ₹0.`, 'success');
-        else if (priorPaid > 0.01) toast('Marked unpaid (₹0). No journals found to reverse — check Books → Journals.', 'warning');
-        else toast('Marked unpaid', 'info');
+
+        if (reversed > 0) {
+          toast(`Marked unpaid (₹0). Reversed ${reversed} journal(s).`, 'success');
+        } else {
+          toast('Marked unpaid (₹0). No prior payment journals found to reverse.', 'info');
+        }
       } catch (e) {
         console.warn('[ledger] unpaid reversal failed', e);
-        toast('Marked unpaid but ledger reverse failed — check Journals', 'warning');
+        toast('Marked unpaid (₹0) but journal reverse failed — check Books → Journals', 'warning');
       }
+      loadBills();
+      return; // avoid second "Marked as unpaid" toast below
+
 } else {
       await saveBill(updated, { overwrite: true });
     }

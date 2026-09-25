@@ -4031,10 +4031,16 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                   </div>
                 );
               })()}
+              <div className="form-group">
+                <label className="form-label">E-Way Bill No (goods only)</label>
+                <input className="form-input" value={details.eWayBillNo || ''}
+                  onChange={(e) => setDetails({ ...details, eWayBillNo: e.target.value })}
+                  placeholder="Threshold in Settings" />
+              </div>
             </div>
 
             {/* Billing Address + Work Order side by side */}
-            <div className="grid grid-cols-2 gap-4" style={{ marginTop: '1rem' }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3" style={{ marginTop: '0.5rem' }}>
             <div className="form-group">
               <label className="form-label">Billing Address (shown above)</label>
               <textarea className="form-input" rows={2} readOnly
@@ -4134,7 +4140,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
             </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4" style={{ marginTop: '0.75rem' }}>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3" style={{ marginTop: '0.5rem' }}>
               <div className="form-group">
                 <label className="form-label">Bill period start</label>
                 <input type="date" className="form-input"
@@ -4159,16 +4165,10 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">E-Way Bill No (goods only; threshold in Settings)</label>
-                <input className="form-input" value={details.eWayBillNo || ''}
-                  onChange={(e) => setDetails({ ...details, eWayBillNo: e.target.value })}
-                  placeholder="Only if invoice has HSN goods lines" />
-                <div className="form-group">
-                  <label className="form-label">Original Invoice # (Credit Notes)</label>
-                  <input className="form-input" value={details.originalInvoiceNumber || ''}
-                    onChange={(e) => setDetails({ ...details, originalInvoiceNumber: e.target.value })}
-                    placeholder="Required for Credit Note" />
-                </div>
+                <label className="form-label">Original Invoice # (Credit Notes)</label>
+                <input className="form-input" value={details.originalInvoiceNumber || ''}
+                  onChange={(e) => setDetails({ ...details, originalInvoiceNumber: e.target.value })}
+                  placeholder="Required for Credit Note" />
               </div>
             </div>
           </div>
