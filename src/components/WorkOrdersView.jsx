@@ -105,7 +105,6 @@ export default function WorkOrdersView() {
       approvedBudget: 0,
       taxRate: 18,
       status: 'approved',
-      date: new Date().toISOString().split('T')[0],
       periodStart: '',
       periodEnd: '',
       notes: '',
@@ -190,23 +189,16 @@ export default function WorkOrdersView() {
   if (form) {
     const t = calcWOTotals(form.items, form.taxRate ?? 18, form.clientState, form.hostState);
     return (
-      <div className="page" style={{ maxWidth: 1100, margin: '0 auto' }}>
+      <div className="page" style={{ width: '100%', maxWidth: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
           <h2 style={{ margin: 0 }}>{form.woNumber ? `Edit ${form.woNumber}` : 'New Work Order'}</h2>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ fontSize: '0.85rem', lineHeight: 1.5 }}>
-              Taxable <b>{formatCurrency(t.sub)}</b>
-              {t.isInterstate
-                ? <> · IGST <b>{formatCurrency(t.igst)}</b></>
-                : <> · CGST <b>{formatCurrency(t.cgst)}</b> · SGST <b>{formatCurrency(t.sgst)}</b></>}
-              {' '}· Budget <b>{formatCurrency(t.total)}</b>
-            </div>
+          <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" className="btn btn-secondary" onClick={() => setForm(null)}>Cancel</button>
             <button type="button" className="btn btn-primary" onClick={save}>Save Work Order</button>
           </div>
         </div>
 
-        <div className="glass-panel p-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10 }}>
+        <div className="glass-panel p-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>
           <div className="form-group">
             <label className="form-label">WO Number</label>
             <input className="form-input" value={form.woNumber || ''} placeholder="Auto on save"
@@ -258,7 +250,7 @@ export default function WorkOrdersView() {
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label">GST %</label>
+            <label className="form-label">Tax Rate %</label>
             <input type="number" className="form-input" value={form.taxRate ?? 18}
               onChange={e => setForm({ ...form, taxRate: Number(e.target.value) || 0 })} />
           </div>
@@ -272,17 +264,14 @@ export default function WorkOrdersView() {
             <input type="date" className="form-input" value={form.periodEnd || ''}
               onChange={e => setForm({ ...form, periodEnd: e.target.value })} />
           </div>
-          <div className="form-group">
-            <label className="form-label">Approved Budget (₹) incl. GST</label>
-            <input type="number" className="form-input" value={t.total} readOnly title="Auto from lines + GST" />
-          </div>
+
         </div>
 
         <div className="glass-panel p-4" style={{ marginTop: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <strong>Line items</strong>
             <button type="button" className="btn btn-secondary btn-sm" onClick={addItem}>
-              <Plus size={14} /> Add row
+              <Plus size={14} /> Add line
             </button>
           </div>
           <div className="table-responsive">
@@ -354,15 +343,8 @@ export default function WorkOrdersView() {
               </tbody>
             </table>
           </div>
-          <div style={{ textAlign: 'right', marginTop: 8, fontSize: '0.9rem', lineHeight: 1.6 }}>
-            <div>Taxable: {formatCurrency(t.sub)}</div>
-            {t.isInterstate
-              ? <div>IGST: {formatCurrency(t.igst)}</div>
-              : <><div>CGST: {formatCurrency(t.cgst)}</div><div>SGST: {formatCurrency(t.sgst)}</div></>}
-            <div><strong>Total: {formatCurrency(t.total)}</strong></div>
-          </div>
           <div className="form-group" style={{ marginTop: 12 }}>
-            <label className="form-label">NOTES</label>
+            <label className="form-label">Notes</label>
             <textarea className="form-input" rows={2} value={form.notes || ''}
               onChange={e => setForm({ ...form, notes: e.target.value })} />
           </div>

@@ -196,12 +196,13 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
     for (const b of bills) {
       if ((b.invoiceType || '').toLowerCase().includes('proforma') || (b.invoiceType || '').toLowerCase().includes('quotation')) continue;
       const cur = b.currency || b.data?.invoiceOptions?.currency || 'INR';
-      if (!byCurrency[cur]) byCurrency[cur] = { total: 0, tax: 0, unpaid: 0 };
+      if (!byCurrency[cur]) byCurrency[cur] = { total: 0, tax: 0, unpaid: 0, received: 0 };
       byCurrency[cur].total += b.totalAmount || 0;
       byCurrency[cur].tax += b.totalTaxAmount || 0;
       const due = (b.totalAmount || 0) - (b.paidAmount || 0);
       if (b.status !== 'paid' && due > 0.01) {
         byCurrency[cur].unpaid += due;
+        byCurrency[cur].received = (byCurrency[cur].received || 0) + (Number(b.paidAmount) || 0);
         const dueDate = b.data?.details?.dueDate || b.dueDate || b.data?.details?.invoiceDate;
         if (dueDate) {
           const dd = new Date(dueDate);
@@ -1340,7 +1341,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
       )}
 
       {listMode ? null : (
-<div className="stats-grid stats-grid-4">
+<div className="stats-grid stats-grid-5">
         <div className="stat-card">
           <div className="stat-icon stat-icon-blue"><IndianRupee size={22} /></div>
           <div style={{ flex: 1 }}>
@@ -1363,6 +1364,18 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
               </div>
             ))}
             {Object.keys(stats.byCurrency).length === 0 && <h2 className="stat-value stat-value-green">—</h2>}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon stat-icon-green"><TrendingUp size={22} /></div>
+          <div style={{ flex: 1 }}>
+            <p className="stat-label">Total Received</p>
+            {Object.entries(stats.byCurrency).map(([cur, v]) => (
+              <div key={cur} className="stat-value" style={{ fontSize: Object.keys(stats.byCurrency).length > 1 ? '1.1rem' : undefined, color: '#059669' }}>
+                {formatCurrency(v.received || 0, cur)}
+              </div>
+            ))}
+            {Object.keys(stats.byCurrency).length === 0 && <h2 className="stat-value" style={{ color: '#059669' }}>—</h2>}
           </div>
         </div>
         <div className="stat-card">

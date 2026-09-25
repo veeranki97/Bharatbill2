@@ -4130,7 +4130,11 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                   })
                   .map(wo => (
                     <option key={wo.id} value={wo.id}>
-                      {wo.woNumber || wo.id} — {wo.title || wo.clientName || 'WO'}{wo.site ? ` · ${wo.site}` : ''} (₹{Number(wo.approvedBudget || 0).toLocaleString('en-IN')})
+                      {wo.woNumber || wo.id}
+                      {wo.clientName ? ` · ${wo.clientName}` : ''}
+                      {wo.title ? ` · ${wo.title}` : ''}
+                      {wo.site ? ` · ${wo.site}` : ''}
+                      {` · ₹${Number(wo.approvedBudget || wo.total || 0).toLocaleString('en-IN')}`}
                     </option>
                   ))}
               </select>

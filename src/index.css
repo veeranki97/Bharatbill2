@@ -3595,3 +3595,17 @@ kbd {
   .sd-inv-toolbar, .sd-inv-party, .sd-inv-addr, .sd-inv-period { grid-template-columns: 1fr 1fr; }
   .sd-inv-body { grid-template-columns: 1fr; }
 }
+
+
+/* SD Dynamics — Sai Durga print: fill page without large empty footer gap */
+@media print {
+  #invoice-preview.invoice-preview-container,
+  body:has(#invoice-preview) #invoice-preview {
+    min-height: auto !important;
+    height: auto !important;
+  }
+}
+.invoice-preview-container[data-pdf-style="saidurga"],
+.invoice-preview-container[data-pdf-style="tally"] {
+  min-height: auto !important;
+}

@@ -697,7 +697,7 @@ const InvoicePreview = React.forwardRef(({ profile, client, details, items, tota
                   <span style={{ textAlign: 'right' }}>{amt(totals.cess)}</span>
                 </div>
               )}
-              {showRoundOff && Number(totals?.roundOff) !== 0 && (
+              {showRoundOff && (
                 <div style={rowStyle}>
                   <span>{cap('Round-off')}</span>
                   <span style={{ textAlign: 'right' }}>
