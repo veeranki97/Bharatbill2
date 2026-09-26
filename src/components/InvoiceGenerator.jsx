@@ -7,7 +7,6 @@ import { INVOICE_TYPES, generateEWayBillJSON, formatCurrency, getCountryConfig, 
 // isValidIndianGSTIN used in save validation
 import { isValidIndianGSTIN as _isValidGSTIN } from '../utils';
 import { canInvoiceAgainstWO, woItemsToInvoiceItems } from '../utils/workOrder';
-import { getHsnMaster, addHsnCode, getUnitMaster } from '../utils/masterData';
 import { journalFromTaxInvoice } from '../utils/ledger';
 import { getPrintSettings, savePrintSettings } from '../utils/printSettings';
 import { openWhatsAppShare } from '../utils/share';
@@ -299,7 +298,7 @@ const LineItem = memo(function LineItem({
   };
   return (
     <div className="line-item-row sd-line-grid" data-item-id={item.id} onKeyDown={handleRowKeyDown}
-      style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 0.7fr 0.8fr 0.9fr 0.9fr 0.9fr 0.7fr auto', gap: 6, alignItems: 'end', width: '100%' }}>
+      style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 0.7fr 0.8fr 0.9fr 0.9fr 0.9fr 0.7fr auto', gap: 6, alignItems: 'end', width: '100%', minWidth: 720 }}>
       <div className="line-item-field" style={{ position: 'relative', minWidth: 0 }}>
         <label className="form-label">Description</label>
         {/* v1.10.37 — Keyboard nav on product suggestions. Reported:
@@ -344,11 +343,11 @@ const LineItem = memo(function LineItem({
               }
             }}>
             <option value="">— SAC/HSN —</option>
-            {item.hsn && ![...(() => { try { return getHsnMaster(); } catch { return []; } })()].includes(item.hsn) && (
+            {item.hsn && ![...(() => { try { return JSON.parse(localStorage.getItem('fgsb_custom_sac')||'[]'); } catch { return []; } })()].includes(item.hsn) && (
               <option value={item.hsn}>{item.hsn}</option>
             )}
             {(() => {
-              try { return getHsnMaster(); } catch { return []; }
+              try { return JSON.parse(localStorage.getItem('fgsb_custom_sac') || '[]'); } catch { return []; }
             })().map(c => <option key={c} value={c}>{c}</option>)}
             {['998311','998312','998313','998314','998399','998599','9954','9965','9972'].map(c => (
               <option key={'d'+c} value={c}>{c}</option>
@@ -456,7 +455,7 @@ const LineItem = memo(function LineItem({
         </div>
       )}
       {showGST && (
-        <div className="line-item-field" style={{ flex: 1 }}>
+        <div className="line-item-field" style={{ flex: 1, minWidth: 72 }}>
           <label className="form-label">{taxLabel} %</label>
           <select className="form-input"
             value={countryTaxRates.includes(Number(item.taxPercent)) ? String(item.taxPercent) : '__custom__'}
@@ -478,7 +477,7 @@ const LineItem = memo(function LineItem({
                 onFieldChange(item.id, 'taxPercent', parseFloat(e.target.value) || 0);
               }
             }}>
-            {countryTaxRates.map(r => (
+            {(Array.isArray(countryTaxRates) && countryTaxRates.length ? countryTaxRates : [0, 5, 12, 18, 28]).map(r => (
               <option key={r} value={String(r)}>{r}%</option>
             ))}
             <option value="__custom__">{countryTaxRates.includes(Number(item.taxPercent)) ? 'Custom…' : `${item.taxPercent}% (custom)`}</option>
@@ -632,8 +631,6 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   const clientNameRef = useRef(null);
   const clientSuggestionsRef = useRef(null);
   const [products, setProducts] = useState([]);
-  const [hsnMasterList, setHsnMasterList] = useState(() => getHsnMaster());
-  const [unitMasterList, setUnitMasterList] = useState(() => getUnitMaster());
   const [productSearch, setProductSearch] = useState({ itemId: null, query: '' });
   const [invoiceOptions, setInvoiceOptions] = useState(() => {
     try {
@@ -720,7 +717,9 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   const hasBeenSaved = useRef(!!editingBill);
 
   const typeConfig = INVOICE_TYPES[invoiceType];
-  const showGST = invoiceOptions.showGST;
+  // CRITICAL FIX: GST% column must follow DOCUMENT TYPE, not sticky localStorage/server options.
+  // Bill of Supply / DC / Composition → hide. Tax Invoice / Proforma / CN / Quotation → always show.
+  const showGST = (INVOICE_TYPES[invoiceType]?.showGST !== false);
   // Tax label and rate presets follow the seller's country, not the client's, since
   // the seller charges and remits the tax. Sellers without a country fall back to India.
   const sellerCountryConfig = getCountryConfig(profile?.country);
@@ -737,11 +736,14 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   const baseCountryRates = sellerCountryConfig.taxRates && sellerCountryConfig.taxRates.length
     ? sellerCountryConfig.taxRates
     : [0, 5, 12, 18, 28];
-  const countryTaxRates = useMemo(
+  const countryTaxRates = (useMemo(
     () => [...new Set([...baseCountryRates, ...customRates])].sort((a, b) => a - b),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [baseCountryRates.join(','), customRates.join(',')]
-  );
+  )) || [0, 5, 12, 18, 28];
+  const _ctr = countryTaxRates.length ? countryTaxRates : [0, 5, 12, 18, 28];
+  // use _ctr below via alias
+  // NOTE: LineItem receives countryTaxRates — ensure non-empty
   const taxLabel = sellerCountryConfig.taxLabel || 'GST';
 
   // Clamp a numeric input to non-negative (and finite). Used for qty/rate/discount.
@@ -787,12 +789,12 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
         // have posted it). Preserves the current bill's snapshot in `prev`.
         delete serverOpts.paymentAccountSnapshot;
         const merged = { ...DEFAULT_OPTIONS, ...serverOpts };
+        // Never let server/local defaults permanently hide GST on Tax Invoices
+        if (merged.showGST === false) merged.showGST = true;
         setInvoiceOptions(prev => {
-          // Only update if different to avoid unnecessary re-renders
           const changed = Object.keys(merged).some(k => merged[k] !== prev[k]);
           if (changed) {
-            // Preserve the per-bill snapshot from prev when applying server defaults.
-            const nextOpts = { ...merged, paymentAccountSnapshot: prev.paymentAccountSnapshot };
+            const nextOpts = { ...merged, paymentAccountSnapshot: prev.paymentAccountSnapshot, showGST: true, showPlaceOfSupply: true };
             const { paymentAccountSnapshot: _skip, ...toPersist } = nextOpts;
             localStorage.setItem('freegstbill_invoiceOptions', JSON.stringify(toPersist));
             return nextOpts;
@@ -1010,8 +1012,6 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       }
     });
     getAllProducts().then(setProducts);
-    setHsnMasterList(getHsnMaster());
-    setUnitMasterList(getUnitMaster());
     // v1.10.24 — Load bills once for client-credit lookup. Refreshed after
     // save (inside saveInvoiceToDB's success path) so the balance stays
     // current when the same session creates multiple invoices for one client.
@@ -1079,6 +1079,15 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
           const snap = getAccountById(d.profile, billSelId);
           if (snap) mergedOpts.paymentAccountSnapshot = snap;
         }
+        // Force GST column on for Tax Invoice even if this bill was saved with showGST:false
+        {
+          const t0 = editingBill.invoiceType || d.invoiceType || d.details?.invoiceType || 'tax-invoice';
+          if (INVOICE_TYPES[t0]?.showGST !== false) {
+            mergedOpts = { ...mergedOpts, showGST: true, showPlaceOfSupply: true };
+          } else {
+            mergedOpts = { ...mergedOpts, showGST: false };
+          }
+        }
         setInvoiceOptions(mergedOpts);
       }
 
@@ -1088,7 +1097,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
         if (convertType) {
           setInvoiceType(convertType);
           const config = INVOICE_TYPES[convertType];
-          if (config) setInvoiceOptions(prev => ({ ...prev, showGST: config.showGST, showPlaceOfSupply: config.showGST }));
+          if (config) setInvoiceOptions(prev => ({ ...prev, showGST: true, showPlaceOfSupply: true }));
         }
         // v1.10.10 — read per-type prefix override from print settings.
         const _psForPrefix = getPrintSettings();
@@ -1356,7 +1365,6 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       const suggested = suggestGstRate(trimmed);
       if (suggested) handleItemChange(itemId, 'taxPercent', suggested.rate);
     } catch { /* ignore */ }
-    setHsnMasterList(getHsnMaster());
     toast(`SAC "${trimmed}" added`, 'success');
   }, [handleItemChange]);
 
@@ -4136,7 +4144,11 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                   })
                   .map(wo => (
                     <option key={wo.id} value={wo.id}>
-                      {wo.woNumber || wo.id} — {wo.title || wo.clientName || 'WO'}{wo.site ? ` · ${wo.site}` : ''} (₹{Number(wo.approvedBudget || 0).toLocaleString('en-IN')})
+                      {wo.woNumber || wo.id}
+                      {wo.clientName ? ` · ${wo.clientName}` : ''}
+                      {wo.title ? ` · ${wo.title}` : ''}
+                      {wo.site ? ` · ${wo.site}` : ''}
+                      {` · ₹${Number(wo.approvedBudget || wo.total || 0).toLocaleString('en-IN')}`}
                     </option>
                   ))}
               </select>
@@ -4278,7 +4290,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
 
           {/* Line Items */}
           <datalist id="sac-codes">
-            {[...new Set([...(hsnMasterList || []), ...((products || []).map(p => p.hsn).filter(Boolean))])].map(h => (
+            {[...new Set((products || []).map(p => p.hsn).filter(Boolean))].map(h => (
               <option key={h} value={h} />
             ))}
             <option value="998311" /><option value="998312" /><option value="998313" />
@@ -4323,7 +4335,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 taxLabel={taxLabel}
                 units={units} 
 				costCenters={costCentersList}
-                countryTaxRates={countryTaxRates}
+                countryTaxRates={(Array.isArray(countryTaxRates) && countryTaxRates.length) ? countryTaxRates : [0, 5, 12, 18, 28]}
                 filterUnitsByMode={filterUnitsByMode}
                 invoiceMode={invoiceOptions.invoiceMode}
                 currency={invoiceOptions.currency}
