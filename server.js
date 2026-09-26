@@ -1144,10 +1144,10 @@ app.get('/api/check-update', async (req, res) => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 4000);
     const [pkgRes, relRes] = await Promise.all([
-      fetch('https://raw.githubusercontent.com/veeranki97/Bharatbill2/main/package.json', { signal: ctrl.signal }),
-      fetch('https://api.github.com/repos/veeranki97/Bharatbill2/releases/latest', {
+      fetch('https://raw.githubusercontent.com/veeranki97/SD-Dynamics/main/package.json', { signal: ctrl.signal }),
+      fetch('https://api.github.com/repos/veeranki97/SD-Dynamics/releases/latest', {
         signal: ctrl.signal,
-        headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'Bharatbill2-update-check' },
+        headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'SD-Dynamics-update-check' },
       }).catch(() => null),
     ]);
     clearTimeout(t);
@@ -1617,7 +1617,7 @@ app.get('{*path}', (req, res) => {
 function servePlaceholder(req, res) {
     if (req.path.startsWith('/api')) return res.status(404).json({ error: 'No such endpoint' });
     res.status(503).send(`<!doctype html>
-<html><head><meta charset="utf-8"><title>Free GST Billing Software — building…</title>
+<html><head><meta charset="utf-8"><title>SD Dynamics — building…</title>
 <meta http-equiv="refresh" content="3">
 <style>
   body { font-family: -apple-system, Segoe UI, Inter, sans-serif; max-width: 560px;
@@ -1632,7 +1632,7 @@ function servePlaceholder(req, res) {
   .box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.85rem 1rem; border-radius: 8px; margin-top: 1rem; }
 </style></head>
 <body>
-  <h1>Free GST Billing Software</h1>
+  <h1>SD Dynamics</h1>
   <p><span class="spinner"></span> The app is still building. This page refreshes every 3 seconds.</p>
   <div class="box">
     <p style="margin:0 0 0.5rem"><strong>Local install?</strong></p>
@@ -1726,7 +1726,7 @@ function startServer(port) {
     // we landed on 47372 instead, next launch tries 47372 first (cuts collision
     // scans in half on repeated reboots of whatever was holding 47371).
     try { fs.writeFileSync(PORT_FILE, String(port), 'utf-8'); } catch { /* ignore */ }
-    console.log(`\n  Free GST Billing Software running at http://localhost:${port}`);
+    console.log(`\n  SD Dynamics running at http://localhost:${port}`);
     console.log(`  Data stored in: ${DATA_DIR}\n`);
   });
   server.on('error', (err) => {

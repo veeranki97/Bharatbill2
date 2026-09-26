@@ -148,6 +148,24 @@ function ReceiptModal({ target, onClose }) {
   );
 }
 
+
+function exportInvoicesCsv(bills) {
+  const cols = ['invoiceNumber','invoiceDate','clientName','status','totalAmount','paidAmount','totalTaxAmount','workOrderId','currency'];
+  const lines = [cols.join(',')].concat((bills || []).map(b => cols.map(c => {
+    let v = b[c];
+    if (c === 'invoiceDate') v = b.data?.details?.invoiceDate || b.invoiceDate || '';
+    if (c === 'clientName') v = b.clientName || b.data?.client?.name || '';
+    if (c === 'workOrderId') v = b.workOrderId || b.data?.workOrderId || '';
+    if (c === 'status') v = b.status || 'unpaid';
+    const s = v == null ? '' : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }).join(',')));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
+  a.download = 'invoices-export.csv';
+  a.click();
+}
+
 export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpenProducts, activeProfile, listMode = false }) {
   // v1.10.64 — requested (#55, @sangwanmail-eng): "An invoice belonging to one
   // company should not appear under the other."
@@ -246,7 +264,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
     } catch { /* ignore */ }
     return {
       date: true, invoice: true, type: true, client: true, amount: true,
-      status: true, actions: true, printed: false, currency: false, dueDate: false,
+      status: true, actions: true, printed: false, currency: false, dueDate: false, workOrder: false,
     };
   });
   const [showColumnPicker, setShowColumnPicker] = useState(false);
@@ -1263,6 +1281,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
             <button type="button" className="btn btn-secondary" onClick={() => {
               downloadSdExport('SD-Invoices-Export.csv', billsToSdCsv(bills));
             }}>SD Export CSV</button>
+            <button type="button" className="btn btn-secondary" onClick={() => exportInvoicesCsv(typeof filteredBills !== 'undefined' ? filteredBills : bills)}>Export CSV</button>
             <button className="btn btn-primary" onClick={onNew}><Plus size={18} /> New Invoice</button>
           </>
         ) : null}
@@ -1341,7 +1360,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
       )}
 
       {listMode ? null : (
-<div className="stats-grid stats-grid-5">
+<div className="stats-grid stats-grid-kpi-4">
         <div className="stat-card">
           <div className="stat-icon stat-icon-blue"><IndianRupee size={22} /></div>
           <div style={{ flex: 1 }}>
@@ -1504,7 +1523,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
               {[
                 ['date', 'Date'], ['invoice', 'Invoice #'], ['type', 'Type'],
                 ['client', 'Client'], ['amount', 'Amount'], ['currency', 'Currency'],
-                ['status', 'Status'], ['dueDate', 'Due date'],
+                ['status', 'Status'], ['dueDate', 'Due date'], ['workOrder', 'Work Order'],
                 ['printed', 'Print count'], ['actions', 'Actions'],
               ].map(([key, label]) => (
                 <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer' }}>
@@ -1616,6 +1635,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
                   {visibleColumns.amount && <th>Amount</th>}
                   {visibleColumns.currency && <th>Currency</th>}
                   {visibleColumns.dueDate && <th>Due Date</th>}
+                  {visibleColumns.workOrder && <th>Work Order</th>}
                   {visibleColumns.printed && <th>Printed</th>}
                   <th>Paid</th>
                   {visibleColumns.status && <th>Status</th>}
@@ -1653,6 +1673,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert, onOpe
                       </td>}
                       {visibleColumns.currency && <td className="text-muted">{billCurrency}</td>}
                       {visibleColumns.dueDate && <td className="text-muted">{bill.data?.details?.dueDate ? new Date(bill.data.details.dueDate).toLocaleDateString('en-IN') : <span className="cell-empty">—</span>}</td>}
+                      {visibleColumns.workOrder && <td className="text-muted">{bill.workOrderId || bill.data?.workOrderId || bill.data?.details?.workOrderNo || <span className="cell-empty">—</span>}</td>}
                       {visibleColumns.printed && <td className="text-muted" style={{ textAlign: 'center' }}>{Number(bill.printedCount) || 0}×</td>}
                       <td className="text-muted">{(bill.paidAmount || 0) > 0 ? formatCurrency(bill.paidAmount, billCurrency) : <span className="cell-empty">—</span>}</td>
                       {visibleColumns.status && <td>

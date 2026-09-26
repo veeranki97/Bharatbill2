@@ -571,7 +571,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   const [details, setDetails] = useState(draft?.details || {
     invoiceNumber: '',
     invoiceDate: new Date().toISOString().split('T')[0],
-    dueDate: '',
+    dueDate: (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().split('T')[0]; })(),
     placeOfSupply: '',
     originalInvoiceRef: '',
     periodStart: '', revisionNo: '', vehicleNo: '',

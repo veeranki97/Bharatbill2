@@ -208,6 +208,113 @@ function deleteFile(filePath) {
 // ========================
 // BILLS
 // ========================
+/**
+ * Server-side GST recompute (Finding 12).
+ * Never trust browser-only tax figures for books / GSTR.
+ * Uses same intra/inter split rules as the client: same state → CGST+SGST, else IGST.
+ */
+function money2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+function stateCodeFromGstin(gstin) {
+  const g = String(gstin || '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+  if (g.length >= 2 && /^\d{2}/.test(g)) return g.slice(0, 2);
+  return '';
+}
+
+function normalizeStateKey(s) {
+  return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function isInterstateBill(profile, client, details) {
+  const hostGst = stateCodeFromGstin(profile?.gstin);
+  const clientGst = stateCodeFromGstin(client?.gstin);
+  if (hostGst && clientGst) return hostGst !== clientGst;
+  const hostState = normalizeStateKey(profile?.state);
+  const pos = normalizeStateKey(details?.placeOfSupply || client?.state);
+  if (hostState && pos) return hostState !== pos;
+  return false;
+}
+
+function recomputeBillTax(bill) {
+  if (!bill || typeof bill !== 'object') return { bill, warnings: ['invalid bill'] };
+  const data = bill.data || {};
+  const items = Array.isArray(data.items) ? data.items : [];
+  const profile = data.profile || {};
+  const client = data.client || {};
+  const details = data.details || {};
+  const invType = (data.invoiceType || bill.type || 'tax-invoice').toLowerCase();
+  const opts = data.invoiceOptions || {};
+  const showGST = opts.showGST !== false
+    && !/bill-of-supply|quotation|proforma|estimate|delivery/.test(invType);
+  const reverseCharge = !!opts.reverseCharge;
+
+  let taxable = 0;
+  let taxTotal = 0;
+  for (const it of items) {
+    const qty = Math.max(0, Number(it.quantity) || Number(it.qty) || 0);
+    const rate = Math.max(0, Number(it.rate) || 0);
+    const disc = Math.max(0, Number(it.discount) || 0);
+    let line = Math.max(0, qty * rate - disc);
+    const taxPct = showGST ? Math.max(0, Number(it.taxPercent) || Number(it.taxRate) || 0) : 0;
+    if (opts.taxInclusive && taxPct > 0) {
+      const base = line / (1 + taxPct / 100);
+      const tax = line - base;
+      taxable += base;
+      taxTotal += tax;
+    } else {
+      taxable += line;
+      taxTotal += line * taxPct / 100;
+    }
+  }
+  taxable = money2(taxable);
+  taxTotal = money2(taxTotal);
+
+  let cgst = 0, sgst = 0, igst = 0;
+  if (showGST && taxTotal > 0 && !reverseCharge) {
+    if (isInterstateBill(profile, client, details)) {
+      igst = taxTotal;
+    } else {
+      cgst = money2(taxTotal / 2);
+      sgst = money2(taxTotal - cgst);
+    }
+  }
+
+  const roundOff = money2(Number(data.totals?.roundOff) || Number(bill.roundOff) || 0);
+  const grand = money2(taxable + cgst + sgst + igst + roundOff);
+
+  const prevTotal = money2(bill.totalAmount);
+  const prevTax = money2(bill.totalTaxAmount);
+  const warnings = [];
+  if (Math.abs(prevTotal - grand) > 1.0 || Math.abs(prevTax - money2(cgst + sgst + igst)) > 1.0) {
+    warnings.push(`Tax recalculated on server (client total ${prevTotal} → ${grand})`);
+  }
+
+  const totals = {
+    ...(data.totals || {}),
+    subtotal: taxable,
+    subTotal: taxable,
+    cgst, sgst, igst,
+    totalTax: money2(cgst + sgst + igst),
+    totalTaxAmount: money2(cgst + sgst + igst),
+    roundOff,
+    total: grand,
+    grandTotal: grand,
+  };
+
+  bill.totalAmount = grand;
+  bill.totalTaxAmount = money2(cgst + sgst + igst);
+  bill.data = {
+    ...data,
+    totals,
+    serverTaxVerified: true,
+    serverTaxWarnings: warnings,
+  };
+  return { bill, warnings };
+}
+
+
 app.get('/api/bills', (req, res) => {
   const bills = readAllFromDir('bills');
   bills.sort((a, b) => new Date(b.invoiceDate) - new Date(a.invoiceDate));
@@ -215,7 +322,7 @@ app.get('/api/bills', (req, res) => {
 });
 
 app.post('/api/bills', (req, res) => {
-  const bill = req.body;
+  let bill = req.body;
   if (!bill || !bill.id) return res.status(400).json({ error: 'Bill must have an id' });
   const filePath = path.join(DATA_DIR, 'bills', safeFileName(bill.id) + '.json');
 
@@ -231,8 +338,21 @@ app.post('/api/bills', (req, res) => {
       invoiceNumber: bill.id,
     });
   }
+
+  // Finding 12 / 18: server-side GST recompute (never trust browser-only tax)
+  let taxWarnings = [];
+  try {
+    if (typeof recomputeBillTax === 'function') {
+      const result = recomputeBillTax(bill);
+      bill = result.bill;
+      taxWarnings = result.warnings || [];
+    }
+  } catch (e) {
+    console.warn('[tax] recompute failed, storing client totals:', e.message);
+  }
+
   writeJSON(filePath, bill);
-  res.json({ success: true });
+  res.json({ success: true, taxWarnings });
 });
 
 // v1.10.31 — Data-F9.1: block deletion of a bill that's a client-credit
@@ -1024,10 +1144,10 @@ app.get('/api/check-update', async (req, res) => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 4000);
     const [pkgRes, relRes] = await Promise.all([
-      fetch('https://raw.githubusercontent.com/veeranki97/Bharatbill2/main/package.json', { signal: ctrl.signal }),
-      fetch('https://api.github.com/repos/veeranki97/Bharatbill2/releases/latest', {
+      fetch('https://raw.githubusercontent.com/veeranki97/SD-Dynamics/main/package.json', { signal: ctrl.signal }),
+      fetch('https://api.github.com/repos/veeranki97/SD-Dynamics/releases/latest', {
         signal: ctrl.signal,
-        headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'Bharatbill2-update-check' },
+        headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'SD-Dynamics-update-check' },
       }).catch(() => null),
     ]);
     clearTimeout(t);
@@ -1497,7 +1617,7 @@ app.get('{*path}', (req, res) => {
 function servePlaceholder(req, res) {
     if (req.path.startsWith('/api')) return res.status(404).json({ error: 'No such endpoint' });
     res.status(503).send(`<!doctype html>
-<html><head><meta charset="utf-8"><title>Free GST Billing Software — building…</title>
+<html><head><meta charset="utf-8"><title>SD Dynamics — building…</title>
 <meta http-equiv="refresh" content="3">
 <style>
   body { font-family: -apple-system, Segoe UI, Inter, sans-serif; max-width: 560px;
@@ -1512,7 +1632,7 @@ function servePlaceholder(req, res) {
   .box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.85rem 1rem; border-radius: 8px; margin-top: 1rem; }
 </style></head>
 <body>
-  <h1>Free GST Billing Software</h1>
+  <h1>SD Dynamics</h1>
   <p><span class="spinner"></span> The app is still building. This page refreshes every 3 seconds.</p>
   <div class="box">
     <p style="margin:0 0 0.5rem"><strong>Local install?</strong></p>
@@ -1606,7 +1726,7 @@ function startServer(port) {
     // we landed on 47372 instead, next launch tries 47372 first (cuts collision
     // scans in half on repeated reboots of whatever was holding 47371).
     try { fs.writeFileSync(PORT_FILE, String(port), 'utf-8'); } catch { /* ignore */ }
-    console.log(`\n  Free GST Billing Software running at http://localhost:${port}`);
+    console.log(`\n  SD Dynamics running at http://localhost:${port}`);
     console.log(`  Data stored in: ${DATA_DIR}\n`);
   });
   server.on('error', (err) => {
